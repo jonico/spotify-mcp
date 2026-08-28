@@ -13,8 +13,11 @@ description: |-
   2. **Get top tracks** - `GET /v1/me/top/tracks`, the call behind `get_top_items`.
      Captures a seed artist and the set of track ids already known.
   3. **Search adjacent tracks** - `GET /v1/search`, the call behind `search_music`,
-     scoped to the seed artist at `offset=20` to surface deeper cuts instead of the
-     same top hits, filtered against the known-tracks set from step 2.
+     scoped to the seed artist and filtered against the known-tracks set from step
+     2, which is what keeps the result off the user's existing rotation. Capped at
+     `limit=10`, the most `/v1/search` accepts, and deliberately without an
+     `offset` - the seed artist comes from the user's own top tracks and may have a
+     catalogue of four, in which case any offset above 0 returns an empty page.
   4. **Create playlist** - `POST /v1/me/playlists`, the call behind
      `create_playlist`. This app's regime resolves to the **restricted** path
      (`create-playlist` family in `spotify_api.with_fallback`); the legacy fallback

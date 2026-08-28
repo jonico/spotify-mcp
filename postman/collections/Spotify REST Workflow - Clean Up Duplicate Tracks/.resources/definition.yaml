@@ -24,9 +24,12 @@ description: |-
   6. **Remove duplicate tracks** - `DELETE /v1/playlists/{id}/items`, the
      restricted-regime call behind `remove_tracks_from_playlist`
      (`spotify_api.playlist_remove_items`); legacy is `DELETE /v1/playlists/{id}/tracks`
-     with the payload keyed `tracks` instead of `items`. Only runs if step 4/5 found
-     a duplicate - the MCP tool itself would ask for elicitation confirmation here,
-     which this direct REST chain does not model.
+     with the payload keyed `tracks` instead of `items`. Always runs, and asserts
+     conditionally on what step 4/5 accumulated: an empty `items` array is not a
+     no-op but a `400 No uris provided`, so a playlist with nothing to remove
+     asserts that rejection rather than a 200. The MCP tool would ask for
+     elicitation confirmation at this point; this direct REST chain does not model
+     that.
 
   ## Credentials
 
