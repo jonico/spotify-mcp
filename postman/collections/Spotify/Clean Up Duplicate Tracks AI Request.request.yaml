@@ -26,9 +26,22 @@ settings:
 userPrompts:
 - id: '1'
   value: |-
-    Find my largest playlist, page through all of its tracks, and remove any exact
-    duplicate tracks you find (same track ID appearing more than once). Tell me
-    which playlist you cleaned and how many duplicates you removed before doing it.
+    Find my largest playlist and clean the exact duplicates out of it.
+
+    Work out which playlist is biggest by paging its tracks - do not trust
+    `total_tracks` from `get_user_playlists` or `get_playlist_info`, which come back
+    null for this app. Page with `get_playlist_tracks` 100 at a time until a page
+    returns fewer rows than you asked for, and note that `total` echoes the page size
+    rather than the playlist length, so count the rows you actually receive.
+
+    A duplicate means the same track id appearing more than once. Ignore different
+    recordings of the same song - a remaster, a live version or a different mix is not
+    a duplicate.
+
+    Before removing anything, show me the playlist you picked, its track count, and
+    each duplicate you found with how many copies exist. Then remove the extra copies,
+    keeping the earliest occurrence of each. Removal will ask me to confirm; if I
+    decline, stop and leave the playlist untouched.
   timestamp: 1756080000000
   active: true
   contentType: text
