@@ -16,8 +16,8 @@ response captured against v0.4.1.
 Four `llm-request` items - **Queue Similar Tracks**, **Build Discovery Playlist**, **Resume
 Liked Songs** and **Clean Up Duplicate Tracks AI Request** - are genuine AI requests: a
 model, this server configured as an MCP tool via `mcpConfig`, and a natural-language goal
-that needs several tools chained together. They need `ANTHROPIC_API_KEY` in addition to the
-usual Spotify credentials.
+that needs several tools chained together. They run against OpenAI (`gpt-5`) and need
+`OPENAI_API_KEY` in addition to the usual Spotify credentials.
 
 Requests whose description says "Not executed" would mutate the live Spotify account —
 create, rename, reorder, unfollow, unlike, queue, device transfer. They are documented on
@@ -64,7 +64,7 @@ resolve. Sample/demo content.
 
 | Environment | Git-synced | Credentials resolve from |
 |---|---|---|
-| **Spotify MCP** | yes | Postman Vault: `spotify-mcp-client-id`, `spotify-mcp-client-secret`, `spotify-mcp-refresh-token`, `spotify-mcp-anthropic-key` |
+| **Spotify MCP** | yes | Postman Vault: `spotify-mcp-client-id`, `spotify-mcp-client-secret`, `spotify-mcp-refresh-token`, `spotify-mcp-openai-key` |
 | **Spotify API Conformance** | **no — cloud only** | values stored in the cloud environment |
 
 The asymmetry is deliberate and load-bearing. Vault values are local and never sync, so they
