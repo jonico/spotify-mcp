@@ -7,6 +7,17 @@ description: |-
   keyed `tracks` instead of `items`. Removes every duplicate track URI accumulated
   across the two paginated read steps. The MCP tool itself would elicit
   confirmation before this call; this direct REST chain does not model that.
+
+  **Asserts conditionally, because a clean playlist is a valid outcome.** An empty
+  `items` array is not a no-op - Spotify rejects it with `400 No uris provided` - so
+  a playlist with nothing to remove must not be asserted against 200. The script
+  branches on how many duplicates the read steps actually accumulated, which keeps
+  the run green either way and turns the empty-payload rejection into a documented
+  assertion rather than an unexplained failure.
+
+  `pm.execution.skipRequest()` is the tempting alternative and the wrong one here:
+  the Postman CLI counts a skipped request as a failed one and exits `1`, which
+  would show up red in a monitor even with every assertion passing.
 method: DELETE
 url: "https://api.spotify.com/v1/playlists/{{playlistId}}/items"
 headers:
@@ -18,13 +29,15 @@ body:
       "items": {{duplicateTrackUris}}
     }
 scripts:
-  - type: beforeRequest
-    code: |-
-      const duplicates = JSON.parse(pm.collectionVariables.get("duplicateTrackUris") || "[]");
-      if (duplicates.length === 0) {
-        console.log("No duplicates found - skipping removal call would need to happen here in a real run.");
-      }
   - type: afterResponse
     code: |-
-      pm.test("duplicate removal returns 200", () => pm.response.to.have.status(200));
+      const duplicates = JSON.parse(pm.collectionVariables.get("duplicateTrackUris") || "[]");
+
+      if (duplicates.length === 0) {
+        console.log("No duplicates in this playlist - asserting the empty-payload rejection.");
+        pm.test("empty removal payload is rejected as 400", () =>
+          pm.expect(pm.response.code).to.equal(400));
+      } else {
+        pm.test("duplicate removal returns 200", () => pm.response.to.have.status(200));
+      }
 order: 6000

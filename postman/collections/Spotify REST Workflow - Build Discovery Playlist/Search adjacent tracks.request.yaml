@@ -2,17 +2,30 @@ $kind: http-request
 name: Search adjacent tracks
 description: |-
   `GET /v1/search` - the call behind the `search_music` tool, scoped to the seed
-  artist from step 2. Uses `offset=20` to reach past the obvious top hits
-  (the same "deeper cuts via offset" pattern the `discover_music_systematically`
-  prompt documents), then filters out anything already in the user's top tracks.
+  artist from step 2, then filtered against the user's top tracks so the playlist
+  gets material they do not already have on repeat.
+
+  Two constraints, both learned by running this against a live account:
+
+  - **`limit` must not exceed 10.** `/v1/search` caps its page size at 10 and
+    answers anything larger with `400 Invalid limit` - unlike `/v1/me/top/tracks`
+    (20) or `/v1/playlists/{id}/items` (100), which accept their documented maxima.
+  - **Do not page deep with a fixed `offset`.** The
+    `discover_music_systematically` prompt suggests reaching past the obvious hits
+    that way, but the seed artist here is derived from the user's own top tracks
+    and may have a very small catalogue - an artist with four indexed tracks
+    returns an empty page for any `offset` above 0, and the chain then has nothing
+    to add. The known-ids filter already excludes the top tracks, which achieves
+    the same "something new" goal without assuming catalogue depth.
 method: GET
-url: "https://api.spotify.com/v1/search?q=artist:{{seedArtist}}&type=track&limit=20&offset=20"
+url: "https://api.spotify.com/v1/search?q=artist:{{seedArtist}}&type=track&limit=10"
 scripts:
   - type: afterResponse
     code: |-
       pm.test("search returns 200", () => pm.response.to.have.status(200));
       const known = JSON.parse(pm.collectionVariables.get("knownTrackIds") || "[]");
-      const items = pm.response.json().tracks.items.filter((t) => !known.includes(t.id));
+      const found = ((pm.response.json() || {}).tracks || {}).items || [];
+      const items = found.filter((t) => !known.includes(t.id));
       const picked = items.slice(0, 15).map((t) => `spotify:track:${t.id}`);
       pm.test("found at least one new track", () => pm.expect(picked.length).to.be.at.least(1));
 

@@ -10,7 +10,8 @@ url: https://api.spotify.com/v1/me/player
 scripts:
   - type: afterResponse
     code: |-
-      pm.test("playback state is readable", () => pm.response.to.have.status.oneOf([200, 204]));
+      pm.test("playback state is readable", () =>
+        pm.expect(pm.response.code).to.be.oneOf([200, 204]));
 
       let seedArtist = "trance";
       let currentTrackId = "";

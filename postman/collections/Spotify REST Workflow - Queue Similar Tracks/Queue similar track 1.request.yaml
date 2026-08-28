@@ -4,10 +4,15 @@ description: |-
   `POST /v1/me/player/queue` - the call behind the `add_to_queue` tool
   (`spotify_client.add_to_queue(uri)`), for the first track found in the previous
   search step.
+
+  **Returns 200, not the documented 204.** The body is an opaque correlation id
+  rather than JSON, so assert on the status set instead of the documented single
+  value - see "Queue similar track 2" for the same behaviour.
 method: POST
 url: "https://api.spotify.com/v1/me/player/queue?uri={{queueTrackUri1}}"
 scripts:
   - type: afterResponse
     code: |-
-      pm.test("track 1 queued", () => pm.response.to.have.status(204));
+      pm.test("track 1 queued", () =>
+        pm.expect(pm.response.code).to.be.oneOf([200, 204]));
 order: 4000

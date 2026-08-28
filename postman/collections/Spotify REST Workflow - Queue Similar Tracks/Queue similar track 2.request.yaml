@@ -3,10 +3,13 @@ name: Queue similar track 2
 description: |-
   `POST /v1/me/player/queue` - the call behind the `add_to_queue` tool, for the
   second track found in the search step.
+
+  **Returns 200, not the documented 204** - as with "Queue similar track 1".
 method: POST
 url: "https://api.spotify.com/v1/me/player/queue?uri={{queueTrackUri2}}"
 scripts:
   - type: afterResponse
     code: |-
-      pm.test("track 2 queued", () => pm.response.to.have.status(204));
+      pm.test("track 2 queued", () =>
+        pm.expect(pm.response.code).to.be.oneOf([200, 204]));
 order: 5000
