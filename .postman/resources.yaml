@@ -4,6 +4,10 @@ cloudResources:
   collections:
     ../postman/collections/Spotify: 6a8d5e4ba15fa52c766b3eda
     ../postman/collections/Spotify API Conformance: 52224998-f2967094-bc38-41c2-b773-4fe6484a6da2
+    ../postman/collections/Spotify REST Workflow - Build Discovery Playlist: 52224998-5d289405-d7d0-45c7-ba4c-f9d5d8cd1ced
+    ../postman/collections/Spotify REST Workflow - Clean Up Duplicate Tracks: 52224998-75b30117-4d7e-4c69-baef-66734b95a8a6
+    ../postman/collections/Spotify REST Workflow - Queue Similar Tracks: 52224998-3aebc6be-8ba9-4a1a-bd87-90779e49f5f5
+    ../postman/collections/Spotify REST Workflow - Resume Liked Songs: 52224998-6fa9c140-43da-493f-87a9-a3af318c947e
   environments:
     ../postman/environments/Spotify MCP.environment.yaml: 52224998-c038b70f-dd9a-4191-b990-da5168bd4c98
   documents:
