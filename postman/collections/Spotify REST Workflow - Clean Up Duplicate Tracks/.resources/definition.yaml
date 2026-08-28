@@ -33,6 +33,12 @@ description: |-
   Needs `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN` from
   the **Spotify MCP** environment. **Destructive**: it removes real tracks from the
   signed-in user's largest playlist if a duplicate is found.
+variables:
+  access_token: ""
+  playlistId: ""
+  totalTracks: ""
+  seenTrackIds: ""
+  duplicateTrackUris: ""
 auth:
   type: bearer
   credentials:

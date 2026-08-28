@@ -23,6 +23,10 @@ description: |-
   Needs `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN` from
   the **Spotify MCP** environment, plus Premium and at least one available device -
   same prerequisites as the tools it mirrors. Starts real playback on the account.
+variables:
+  access_token: ""
+  deviceId: ""
+  likedTrackUris: ""
 auth:
   type: bearer
   credentials:

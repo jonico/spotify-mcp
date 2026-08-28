@@ -25,6 +25,12 @@ description: |-
   the **Spotify MCP** environment. Requires an active playback session and Premium,
   same as the tools it mirrors - if nothing is playing, step 2 falls back to a plain
   "trance" search so the rest of the chain still has something to queue.
+variables:
+  access_token: ""
+  seedArtist: ""
+  currentTrackId: ""
+  queueTrackUri1: ""
+  queueTrackUri2: ""
 auth:
   type: bearer
   credentials:

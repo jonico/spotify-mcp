@@ -1,4 +1,5 @@
 $kind: collection
+name: Spotify API Conformance
 description: |-
   Live conformance checks against `api.spotify.com`, built to run unattended in a
   Postman monitor and fail when Spotify changes what this app is allowed to do.
@@ -66,3 +67,5 @@ description: |-
   Every run costs 8 requests against the monitor allowance, which since July 2026
   is counted per **developer account** rather than per app. Check headroom before
   picking a frequency.
+variables:
+  access_token: ""

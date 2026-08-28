@@ -29,6 +29,11 @@ description: |-
   Needs `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN` from
   the **Spotify MCP** environment. Creates a real, non-destructive playlist on the
   signed-in account each time it runs.
+variables:
+  access_token: ""
+  seedArtist: ""
+  knownTrackIds: ""
+  playlistId: ""
 auth:
   type: bearer
   credentials:
