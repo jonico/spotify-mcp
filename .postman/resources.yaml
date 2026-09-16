@@ -1,5 +1,3 @@
-workspace:
-  id: 32272076-0f04-4b29-ad34-da1c96163d42
 cloudResources:
   collections:
     ../postman/collections/Spotify: 6a8d5e4ba15fa52c766b3eda
@@ -8,7 +6,11 @@ cloudResources:
     ../postman/collections/Spotify REST Workflow - Clean Up Duplicate Tracks: 52224998-75b30117-4d7e-4c69-baef-66734b95a8a6
     ../postman/collections/Spotify REST Workflow - Queue Similar Tracks: 52224998-3aebc6be-8ba9-4a1a-bd87-90779e49f5f5
     ../postman/collections/Spotify REST Workflow - Resume Liked Songs: 52224998-6fa9c140-43da-493f-87a9-a3af318c947e
-  environments:
-    ../postman/environments/Spotify MCP.environment.yaml: 52224998-c038b70f-dd9a-4191-b990-da5168bd4c98
   documents:
     ../postman/documents/WORKSPACE-README.md: 14947863-89b4-4e47-9fde-21def3301f16
+  environments:
+    ../postman/environments/Spotify MCP.environment.yaml: 52224998-c038b70f-dd9a-4191-b990-da5168bd4c98
+  globals:
+    ../postman/globals/workspace.globals.yaml: 91d04612-2fdb-48fc-84ce-dd3b11670f40
+workspace:
+  id: 32272076-0f04-4b29-ad34-da1c96163d42
