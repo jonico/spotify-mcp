@@ -3,7 +3,7 @@ description: |-
   **Purpose:** fetch the `create_mood_playlist` **prompt** with
   mood=melancholic, genre=trance, decade=90s.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio), read from the prompt implementation — prompts are pure string
+  **Result** (read from the prompt implementation — prompts are pure string
   builders, so output is deterministic for given arguments): returns the instruction
   text "Create a Spotify playlist for a melancholic mood with trance music from the 90s",
   followed by the 3-step workflow (`search_music` → `create_playlist` →

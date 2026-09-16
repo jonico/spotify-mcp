@@ -1,0 +1,34 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** fetch artist metadata plus top tracks.
+
+  **Result:** the artist, with `genres: []` and `popularity`/`followers` null.
+  `top_tracks` is always `[]` — Spotify withholds top tracks from this app, and the tool
+  returns the artist anyway rather than failing on it.
+
+  On the published PyPI build this tool fails outright with
+  `Playback is restricted for this content [playback_restricted]` for every artist,
+  including valid IDs. If that is what you get, the build is older than the fix.
+
+  For artist metadata without the top-tracks call at all, use the `spotify://artist/{id}`
+  resource — see "Artist Resource" in this collection.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "get_artist_info",
+      "arguments": {
+        "artist_id": "5gY5PFULD9iPkwMzZrYRAV"
+      }
+    }
+  }
+settings:
+  version: auto
+  requestTimeout: 0
+order: 18000

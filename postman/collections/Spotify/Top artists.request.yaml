@@ -4,13 +4,12 @@ description: |-
   audio-features and related-artists withdrawn from third-party apps, this plus
   `get_recently_played` is the measured foundation for any suggestion feature.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): **1** artist returned despite `limit: 5` — Cosmic Gate
-  (`6ySxYu68zTsO5ghsThpGtS`), with `genres: []`, `popularity` and `followers` null.
-  `tracks` is null, as expected when `item_type` is artists.
+  **Result:** up to `limit` artists, each with `genres: []` and `popularity`/`followers`
+  null. `tracks` is null, as expected when `item_type` is artists.
 
-  A result count far below the requested limit is one of the documented signatures of an
-  upstream change — worth a `/spotify-api-watch` run rather than assuming the account
-  simply has little history.
+  Expect fewer than `limit` results on an account with little listening history — the tool
+  returns what the history holds, and a short count here does not indicate a truncated
+  response.
 transport: stdio
 command: uvx spotify-mcp-jamiew
 env:

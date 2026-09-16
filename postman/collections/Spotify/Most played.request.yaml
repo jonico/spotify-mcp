@@ -3,7 +3,7 @@ description: |-
   **Purpose:** fetch the `taste_profile` prompt with default arguments
   (`time_range` defaults to medium_term).
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio), read from the prompt implementation): returns text instructing the
+  **Result** (read from the prompt implementation): returns text instructing the
   client to combine `get_top_items` for both artists and tracks with
   `get_recently_played`, then report dominant genres/moods, recent shifts, and blind
   spots.

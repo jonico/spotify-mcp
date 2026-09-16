@@ -3,7 +3,7 @@ description: |-
   **Purpose:** the `discover_similar` prompt — how to answer "artists like X" now that
   Spotify has withdrawn related-artists and `/recommendations` from third-party apps.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio), read from the prompt implementation): returns a template telling the
+  **Result** (read from the prompt implementation): returns a template telling the
   client to chain `get_artist_info` for genres → `search_music` with `genre:`/`year:`
   filters → `get_top_items` to bias toward known taste, then return 8-10 artists with a
   representative track each.

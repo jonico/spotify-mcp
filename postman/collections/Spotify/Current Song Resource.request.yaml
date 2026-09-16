@@ -3,7 +3,7 @@ description: |-
   **Purpose:** despite the name, this is *not* a resource read — the message is
   `tools/call` → `control_playback` and is byte-identical to "Play MJRSBRN".
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): same as "Play MJRSBRN" — starts
+  **Result:** same as "Play MJRSBRN" — starts
   "Und dann kommt ein Mensch" — Major Sunburn.
 
   For the actual resource equivalent see "Current Playback Resource"

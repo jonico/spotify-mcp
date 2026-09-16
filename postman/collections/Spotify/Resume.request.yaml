@@ -3,7 +3,7 @@ description: |-
   **Purpose:** resume playback with no arguments — `action: play` and every other
   field null means "continue whatever is loaded" rather than "start something new".
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `is_playing: true` from `progress_ms: 7922`, same track.
+  **Result:** `is_playing: true` from `progress_ms: 7922`, same track.
 transport: stdio
 command: uvx spotify-mcp-jamiew
 env:

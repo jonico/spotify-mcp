@@ -17,32 +17,39 @@ description: |-
   | Resources | 6 / 6 | 1 pre-existing, 5 added |
   | Prompts | 5 / 5 | 2 pre-existing, 3 added |
 
-  Requests whose description says "Not executed" mutate the live account (create/rename/  
-  reorder/unfollow/unlike, queue and device transfer). They are documented but deliberately  
-  never run. Everything else carries the real response captured on 2026-08-25 against  
-  spotify-mcp-jamiew 0.4.1.
+  Requests whose description says "Not executed" mutate the live account (create/rename/
+  reorder/unfollow/unlike, queue and device transfer). They are documented but deliberately
+  never run. Everything else describes the response the request actually returns.
 
-  ## Known defects found while documenting this
+  ## Behaviour to expect
 
-  - `get_artist_info` is **dead for every artist** — it calls `artist_top_tracks()`, which  
-      returns `playback_restricted` and is not routed through `with_fallback`. The  
-      `spotify://artist/{id}` resource works because it omits that call.
-      
-  - `get_playlist_tracks` reports `total` as the returned page size, not the playlist  
-      length. `get_user_playlists`, `get_playlist_info` and the playlist resource return  
-      `tracks`/`total_tracks` as `null`. Together these make playlist size unobtainable  
-      without fetching every page.
-      
-  - `control_playback` can return an empty/`is_playing: false` state on a successful `play`  
-      when it had to activate an idle device — read back with `get_playback_state`.
-      
-  - `get_top_items` returned 1 artist for `limit: 5`.
+  The published PyPI build and the current upstream build differ. Five of the items under
+  **Works** fail on the PyPI build that `uvx spotify-mcp-jamiew` installs; both builds report
+  the same version number, so only a behavioural check distinguishes them. Everything under
+  **Does not work** applies to both.
 
-  - `get_track_info` **cannot batch**. One ID works (bare or as a single-element list),
-    two or more fail with `playback_restricted`, because anything longer than one uses the
-    withheld `/v1/tracks?ids=` endpoint. The docstring's "50 tracks = 1 API call" is
-    unreachable; loop the single-ID form. Same shape as the `get_artist_info` defect.
-      
+  ### Works
+
+  - `get_artist_info` returns the artist. `top_tracks` is `[]` — Spotify withholds them.
+  - `search_music` accepts `limit` above 10 and returns 10 rows with `"limit": 10`.
+  - `get_track_info` accepts several IDs; three IDs return three tracks.
+  - `control_playback` returns live state: `play` gives `is_playing: true` with the track,
+      `next` gives the new track.
+  - `get_top_items` honours `limit` — 5 returns 5 artists, 10 returns 10.
+  - `get_playlist_info` reports a real `total_tracks`.
+
+  ### Does not work
+
+  - `get_user_playlists` returns `total_tracks: null` for every entry. Playlist size is not
+      available from the list — page each playlist and count the rows returned.
+  - `get_playlist_tracks` reports `total` as the returned page size, not the playlist length.
+  - `search_music` can return `"total": 0` alongside populated `items` — a filtered search
+      (`query: "I got that"`, `artist: "Kotorri"`) returned three tracks with `total` zero.
+      Read `items`; never branch on `total`.
+  - Artist and user objects come back with `genres: []` and `popularity`/`followers` null.
+  - `add_tracks_to_playlist` takes `track_uris`, not `track_ids`.
+  - Field filters inside `query` (`artist:Name`) are not honoured; use the `artist`, `album`,
+      `year` and `genre` parameters instead.
 
   ## AI Workflow Requests
 

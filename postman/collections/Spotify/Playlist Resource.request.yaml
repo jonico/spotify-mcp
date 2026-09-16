@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** playlist metadata via `spotify://playlist/{playlist_id}`.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): name, id, owner, empty description, `public: true`, and
+  **Result:** name, id, owner, empty description, `public: true`, and
   `tracks`/`total_tracks` both null — the same null-count defect as the tool path, since
   both build the same `Playlist` model.
 transport: stdio

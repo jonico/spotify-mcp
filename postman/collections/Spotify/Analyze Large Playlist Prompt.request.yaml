@@ -3,7 +3,7 @@ description: |-
   **Purpose:** the `analyze_large_playlist` prompt — a pagination strategy for playlists
   too big to read in one go.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio), read from the prompt implementation): returns a 3-step template —
+  **Result** (read from the prompt implementation): returns a 3-step template —
   `get_playlist_info` for size, then `get_playlist_tracks` in 100-track pages, then
   analysis branching on `analysis_type` (overview / detailed / duplicates / mood).
 

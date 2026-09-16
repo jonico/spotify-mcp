@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** album metadata via `spotify://album/{album_id}`.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): album fields only — name, artist, release date/precision,
+  **Result:** album fields only — name, artist, release date/precision,
   `total_tracks: 1`, `album_type: single`. No track list, unlike the `get_album_info`
   tool.
 transport: stdio

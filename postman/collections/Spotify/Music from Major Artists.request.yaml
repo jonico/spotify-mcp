@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** artist-type search (`qtype: artist`) rather than track search.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `total: 11`; top hit Major Sunburn
+  **Result:** `total: 11`; top hit Major Sunburn
   (`5zbSsk4Qg514fYzb3KhQX7`). Other hits are fuzzy name matches (Sunbeam, Major Lazer,
   Major Moment, Peter Schilling).
 

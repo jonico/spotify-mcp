@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** page the user's Liked Songs library.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `total: 2` — "Und dann kommt ein Mensch" — Major Sunburn (added
+  **Result:** `total: 2` — "Und dann kommt ein Mensch" — Major Sunburn (added
   2026-08-25T15:16:05Z, by the "Like track" request in this collection) and
   "Labyrinth of Mirrors" — Aimoon, Victor Tayne (added 2026-08-24T17:21:45Z).
 

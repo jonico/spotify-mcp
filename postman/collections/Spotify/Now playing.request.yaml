@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** read the current playback state — track, device, volume, shuffle/repeat.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `is_playing: true`, "Raise Your Glass" — P!nk (*Raise Your Glass*,
+  **Result:** `is_playing: true`, "Raise Your Glass" — P!nk (*Raise Your Glass*,
   2010) on device `PM-MYKFWG6W19`, volume 100, `progress_ms: 177961`, shuffle off,
   repeat off.
 transport: stdio

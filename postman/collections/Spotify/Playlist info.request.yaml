@@ -3,7 +3,7 @@ description: |-
   **Purpose:** playlist metadata *without* tracks — the cheap counterpart to
   "Show playlist details".
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): "Backstreet Boys, Avril Lavigne, Michael Jackson, Taylor Swift",
+  **Result:** "Backstreet Boys, Avril Lavigne, Michael Jackson, Taylor Swift",
   owner Johannes Nicolai, `public: true`.
 
   Known defect: `tracks` and `total_tracks` are both null even though the playlist holds

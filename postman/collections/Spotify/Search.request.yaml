@@ -3,7 +3,7 @@ description: |-
   **Purpose:** track search, exercising the optional filter arguments
   (`year`, `year_range`, `genre`, `artist`, `album`) explicitly passed as null.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `total: 12`. Top hit is the exact match —
+  **Result:** `total: 12`. Top hit is the exact match —
   "Und dann kommt ein Mensch" — Major Sunburn (`6ADPS6h7kuqZwqekUrLTEp`, 2026-01-22).
   Explicit nulls are accepted rather than rejected.
 transport: stdio

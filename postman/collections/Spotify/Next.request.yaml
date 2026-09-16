@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** skip to the next track in the active context.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): advanced to "Complicated" — Avril Lavigne (*Let Go*, 2002),
+  **Result:** advanced to "Complicated" — Avril Lavigne (*Let Go*, 2002),
   `progress_ms: 78`. Requires Premium and an already-active device.
 transport: stdio
 command: uvx spotify-mcp-jamiew

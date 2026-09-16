@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** an artist via `spotify://artist/{artist_id}`.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): **works** — `{"name": "Major Sunburn", "id":
+  **Result:** **works** — `{"name": "Major Sunburn", "id":
   "5zbSsk4Qg514fYzb3KhQX7", "genres": [], "popularity": null, "followers": null}`.
 
   This is the direct contrast to "Artist Info Major Tom (does not work)": the resource

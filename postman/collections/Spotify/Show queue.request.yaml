@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** read what is playing plus the upcoming queue.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)):
+  **Result:**
   `currently_playing` = "Und dann kommt ein Mensch" — Major Sunburn, followed by 12 queue
   entries alternating it with "Was Ist Freundschaft Wert (Major Sunburn Harmony Edit)".
 

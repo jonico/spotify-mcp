@@ -3,7 +3,7 @@ description: |-
   **Purpose:** demonstrate the elicitation gate. `remove_tracks_from_playlist` is marked
   destructive, so the server asks the client to confirm before deleting anything.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): the server issued an elicitation request; it was **declined**,
+  **Result:** the server issued an elicitation request; it was **declined**,
   yielding `{"status": "cancelled", "message": "Removal cancelled by user",
   "snapshot_id": null}`. "My playlist #1" was left untouched with its single track.
 

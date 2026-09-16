@@ -3,7 +3,7 @@ description: |-
   **Purpose:** save (like) a track into the user's library. Additive, not destructive —
   `destructiveHint` is correctly false.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `{"status": "success", "message": "Saved 1 track(s)",
+  **Result:** `{"status": "success", "message": "Saved 1 track(s)",
   "snapshot_id": null}`. Library went from 1 to 2 saved tracks; the new entry carries
   `added_at: 2026-08-25T15:16:05Z`.
 transport: stdio

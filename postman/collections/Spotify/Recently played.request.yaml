@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** listening history, most recent first, each entry carrying `played_at`.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): 5 items — "Raise Your Glass" — P!nk (15:15:06Z),
+  **Result:** 5 items — "Raise Your Glass" — P!nk (15:15:06Z),
   "Since U Been Gone" — Kelly Clarkson (15:11:43Z), "Sk8er Boi" — Avril Lavigne
   (15:08:33Z), "I Just Can't Stop Loving You" — Michael Jackson (10:48:25Z),
   "Thriller" — Michael Jackson (09:28:22Z).

@@ -3,7 +3,7 @@ description: |-
   **Purpose:** read the `spotify://user/current` MCP **resource** — the resource-shaped
   counterpart to the `get_me` tool.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `text/plain` body containing
+  **Result:** `text/plain` body containing
   `{"id": "31et4tmmf46ixoe7tltp43sjxvk4", "display_name": "Johannes Nicolai",
   "followers": 0, "country": "DE", "product": "premium"}`.
 

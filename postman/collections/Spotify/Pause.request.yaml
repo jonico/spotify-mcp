@@ -2,8 +2,8 @@ $kind: mcp-request
 description: |-
   **Purpose:** pause playback on the active device.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `is_playing: false`, frozen at `progress_ms: 7295` on
-  "Complicated". The track stays loaded, so Resume continues from the same offset.
+  **Result:** `is_playing: false`, frozen at the current `progress_ms`. The track stays
+  loaded, so Resume continues from the same offset.
 transport: stdio
 command: uvx spotify-mcp-jamiew
 env:

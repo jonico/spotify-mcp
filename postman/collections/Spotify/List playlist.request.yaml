@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** list the signed-in user's playlists, first page.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): `total: 5` — Melancholic 90s Trance, Game of Thrones Soundtrack
+  **Result:** `total: 5` — Melancholic 90s Trance, Game of Thrones Soundtrack
   (All Seasons) (owner: Low Fidelity), Lilli & Thomas (owner: thomasbrits), "Backstreet
   Boys, Avril Lavigne, Michael Jackson, Taylor Swift", My playlist #1.
 

@@ -3,7 +3,7 @@ description: |-
   **Purpose:** a single track by ID, via the templated resource
   `spotify://track/{track_id}`.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): the full track JSON — same shape as one element of
+  **Result:** the full track JSON — same shape as one element of
   `get_track_info`'s `tracks` array.
 transport: stdio
 command: uvx spotify-mcp-jamiew

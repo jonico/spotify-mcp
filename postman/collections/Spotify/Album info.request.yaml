@@ -2,7 +2,7 @@ $kind: mcp-request
 description: |-
   **Purpose:** album metadata plus its track list.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): "Und dann kommt ein Mensch" — Major Sunburn, `album_type: single`,
+  **Result:** "Und dann kommt ein Mensch" — Major Sunburn, `album_type: single`,
   `total_tracks: 1`, released 2026-01-22 (`release_date_precision: day`), and the single
   track inline. `label`, `popularity` null and `genres` empty.
 

@@ -1,26 +1,19 @@
 $kind: mcp-request
 description: |-
-  **Purpose:** track metadata by ID. Accepts a single string *or* a list, and the tool
-  advertises batching up to 50 IDs as one upstream call instead of 50.
+  **Purpose:** track metadata by ID. Accepts a single string *or* a list.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): 1 track — "Und dann kommt ein Mensch" — Major Sunburn, album
-  `7y8mOM5mWNSAean59dK3co`, released 2026-01-22, 185200 ms. `popularity` is null (a
-  field the restricted regime strips, optional by design).
+  **Result:** one entry per requested ID. `popularity` is null — the restricted regime
+  strips it.
 
-  **Batching does not currently work.** Two or more IDs fail outright:
+  Several IDs work: a bare string, a one-element list and a multi-element list all return
+  their tracks. The batch endpoint (`/v1/tracks?ids=`) is withheld from this app, so a
+  multi-ID call is served by one upstream request per track rather than one for the whole
+  set — correct results, but not the single-call efficiency the docstring describes.
 
-  - `"6ADPS6h7kuqZwqekUrLTEp"` (bare string) — works
-  - `["6ADPS6h7kuqZwqekUrLTEp"]` (list of one) — works
-  - `["6ADPS6h7kuqZwqekUrLTEp", "7AvWmlcIj7LhwnVqNT4UYa"]` — fails with
-    `Playback is restricted for this content [playback_restricted]`
-
-  A one-element list takes the single-track path; anything longer uses the batch endpoint
-  (`/v1/tracks?ids=`), which is withheld from this app. So the efficiency the docstring
-  promises is unavailable — loop the single-ID form instead. This is the same class of
-  failure as "Artist Info Major Tom": one call in a tool is withheld and takes the whole
-  tool down with it.
-
-  This is why the two Major Sunburn tracks are paired in "Play MJRSBRN" rather than here.
+  On the published PyPI build two or more IDs fail with
+  `Playback is restricted for this content [playback_restricted]`; a single ID still works.
+  If that is what you get, the build is older than the fix and you must loop the
+  single-ID form.
 transport: stdio
 command: uvx spotify-mcp-jamiew
 env:

@@ -3,7 +3,7 @@ description: |-
   **Purpose:** page through a playlist's tracks. `limit: null` means "all tracks, up to
   the 10,000 safety cap".
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio)): "My playlist #1" → 1 track, "Dandelions" — Ruth B.
+  **Result:** "My playlist #1" → 1 track, "Dandelions" — Ruth B.
   (*Safe Haven*, 2017).
 
   Known defect: `total` echoes the number of rows returned rather than the playlist

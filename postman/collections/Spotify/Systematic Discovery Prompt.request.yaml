@@ -3,7 +3,7 @@ description: |-
   **Purpose:** the `discover_music_systematically` prompt — deliberate use of search
   offsets to reach past the popular head of the results.
 
-  **Result** (Executed 2026-08-25 against spotify-mcp-jamiew 0.4.1 (stdio), read from the prompt implementation): returns a template that walks
+  **Result** (read from the prompt implementation): returns a template that walks
   offsets in bands (0-20 popular, 20-60 hidden gems, 80-100+ deep cuts), suggests derived
   queries from artist/album/genre/decade, scales effort by
   `exploration_depth` (light/medium/deep), and targets 15-25 curated tracks.
