@@ -3,8 +3,10 @@ description: |-
   **Purpose:** ask whether specific tracks are in the Liked Songs library, without
   paging it. Takes up to 50 ids and answers in one request.
 
-  **Result:** one boolean per requested id, in the order asked. The two ids here are
-  the tracks the "Like track" request saves, so both read true once that has run.
+  **Result:** `results`, a map of track id to boolean, plus `checked` — the number of
+  ids answered. Not a positional list: read each id out of the map by key.
+
+  Both ids here read `true`; they are the tracks the "Like track" request saves.
 
   Prefer this over walking `get_saved_tracks` when the question is membership rather
   than contents — a large library costs many pages to answer the same thing.

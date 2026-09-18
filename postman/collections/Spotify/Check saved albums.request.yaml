@@ -3,7 +3,9 @@ description: |-
   **Purpose:** ask whether specific albums are saved in the library. Takes up to 20
   ids and answers in one request.
 
-  **Result:** one boolean per requested id, in the order asked.
+  **Result:** `results`, a map of album id to boolean, plus `checked`. Both ids here
+  read `false` — the albums are not saved, though tracks from them are liked, which
+  is a separate library.
 
   The 20-id ceiling is lower than the 50 for tracks and artists — Spotify sizes the
   album batch route differently.

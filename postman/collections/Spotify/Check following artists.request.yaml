@@ -3,7 +3,14 @@ description: |-
   **Purpose:** ask whether the user follows specific artists. Takes up to 50 ids and
   answers in one request.
 
-  **Result:** one boolean per requested id, in the order asked.
+  **Result: fails.** `Playback is restricted for this content [playback_restricted]`,
+  for a single id as well as a list — the follow-check route is withheld from this
+  app, so the tool is unusable here. Its siblings `check_saved_tracks` and
+  `check_saved_albums` both work.
+
+  Kept in the collection to document the tool's existence and its current failure. If
+  it starts answering, expect `results` (a map of artist id to boolean) plus
+  `checked`, matching the other two.
 
   Following is distinct from top-artist standing: an artist can appear in
   `get_top_items` without being followed, and vice versa.

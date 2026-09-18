@@ -28,8 +28,13 @@ description: |-
   - `get_artist` returns an `artists` **list**, not a single `artist`. `top_tracks` is `[]` —
       Spotify withholds them. Reads up to 50 artists per request.
   - `get_album` returns an `albums` **list**, not a single `album`. Reads up to 20 per request.
-  - `check_saved_tracks`, `check_saved_albums` and `check_following_artists` answer library
-      membership in one request instead of paging the library.
+  - `check_saved_tracks` and `check_saved_albums` answer library membership in one request
+      instead of paging the library. Both return `results`, a map of id to boolean, plus a
+      `checked` count — not a positional list.
+  - `get_album` for a single id also returns the album's `tracks`; a batch omits them. The
+      same holds for `get_artist` and `top_tracks`, which is empty either way here.
+  - Track objects carry `is_local`, and `id` is optional, so local files come back rather
+      than being dropped.
   - `search_music` accepts `limit` above 10 and returns 10 rows with `"limit": 10`.
   - `get_tracks` accepts several IDs; three IDs return three tracks.
   - `control_playback` returns live state: `play` gives `is_playing: true` with the track,
@@ -46,6 +51,9 @@ description: |-
       (`query: "I got that"`, `artist: "Kotorri"`) returned three tracks with `total` zero.
       Read `items`; never branch on `total`.
   - Artist and user objects come back with `genres: []` and `popularity`/`followers` null.
+  - `check_following_artists` fails with `playback_restricted` for any input, single id or
+      list. The follow-check route is withheld from this app; the saved-tracks and
+      saved-albums equivalents work.
   - `add_tracks_to_playlist` takes `track_uris`, not `track_ids`.
   - Field filters inside `query` (`artist:Name`) are not honoured; use the `artist`, `album`,
       `year` and `genre` parameters instead.

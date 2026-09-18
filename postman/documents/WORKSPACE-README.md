@@ -123,6 +123,8 @@ Known limits:
 - `search_music` rejects `limit` above 10 on the wire; the tool retries at the cap rather
   than failing.
 - Artist and user objects come back with `genres: []` and `popularity`/`followers` null.
+- `check_following_artists` fails with `playback_restricted` for any input. The route is
+  withheld from this app; `check_saved_tracks` and `check_saved_albums` work.
 
 Five defects this workspace originally documented — `get_artist` dead for every artist,
 `get_tracks` unable to batch, the `search_music` limit rejection surfacing as an error,
