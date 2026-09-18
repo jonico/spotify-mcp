@@ -1,7 +1,7 @@
 $kind: http-request
 name: Single track read works
 description: |-
-  The per-track route that `get_track_info` falls back to when batching is
+  The per-track route that `get_tracks` falls back to when batching is
   withheld. If this ever breaks, track lookup has no working path at all.
 method: GET
 url: https://api.spotify.com/v1/tracks/6ADPS6h7kuqZwqekUrLTEp

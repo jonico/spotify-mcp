@@ -1,0 +1,29 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** ask whether the user follows specific artists. Takes up to 50 ids and
+  answers in one request.
+
+  **Result:** one boolean per requested id, in the order asked.
+
+  Following is distinct from top-artist standing: an artist can appear in
+  `get_top_items` without being followed, and vice versa.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "check_following_artists",
+      "arguments": {
+        "artist_ids": ["7wU1naftD3lNq7rNsiDvOR", "0JQkxELt1FoL470ADWZaOX"]
+      }
+    }
+  }
+settings:
+  version: auto
+  requestTimeout: 0
+order: 48200

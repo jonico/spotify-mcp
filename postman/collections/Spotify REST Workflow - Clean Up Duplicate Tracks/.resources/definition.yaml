@@ -3,8 +3,8 @@ name: Spotify REST Workflow - Clean Up Duplicate Tracks
 description: |-
   The literal Spotify Web API calls behind the **Clean Up Duplicate Tracks AI
   Request** in the `Spotify` collection - no MCP server, no LLM, no mocks. Each
-  request is one of the HTTP calls behind the `get_user_playlists`,
-  `get_playlist_info`, `get_playlist_tracks` and `remove_tracks_from_playlist`
+  request is one of the HTTP calls behind the `list_playlists`,
+  `get_playlist`, `get_playlist_tracks` and `remove_tracks_from_playlist`
   tools, chained with collection variables in the order an agent following that
   prompt would need them.
 
@@ -12,9 +12,9 @@ description: |-
 
   1. **Get user access token** - refresh-token grant.
   2. **Get user playlists** - `GET /v1/me/playlists`, the call behind
-     `get_user_playlists`. Picks the playlist with the most tracks.
+     `list_playlists`. Picks the playlist with the most tracks.
   3. **Get playlist info** - `GET /v1/playlists/{id}`, the call behind
-     `get_playlist_info`.
+     `get_playlist`.
   4/5. **Get playlist tracks page 1/2** - `GET /v1/playlists/{id}/items`, the
      restricted-regime call behind `get_playlist_tracks`
      (`spotify_api.playlist_items`), at `offset=0` then `offset=100` - the exact

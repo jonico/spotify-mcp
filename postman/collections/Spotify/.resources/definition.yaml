@@ -2,7 +2,7 @@ $kind: collection
 description: |-
   Spotify MCP collection for playback control, content discovery, playlist browsing, and  
   user/library actions. Every request is an **AI (MCP) request** speaking JSON-RPC to  
-  `uvx spotify-mcp-jamiew` over stdio, covering all 25 tools, 6 resources and 5 prompts the  
+  `uvx spotify-mcp-jamiew` over stdio, covering all 28 tools, 6 resources and 5 prompts the  
   server exposes.
 
   Credentials come from the **Spotify MCP** environment (`{{SPOTIFY_CLIENT_ID}}`,  
@@ -13,7 +13,7 @@ description: |-
 
   | Surface | Covered | Notes |
   | --- | --- | --- |
-  | Tools | 25 / 25 | 8 pre-existing, 17 added |
+  | Tools | 28 / 28 | 8 pre-existing, 20 added |
   | Resources | 6 / 6 | 1 pre-existing, 5 added |
   | Prompts | 5 / 5 | 2 pre-existing, 3 added |
 
@@ -23,24 +23,23 @@ description: |-
 
   ## Behaviour to expect
 
-  The published PyPI build and the current upstream build differ. Five of the items under
-  **Works** fail on the PyPI build that `uvx spotify-mcp-jamiew` installs; both builds report
-  the same version number, so only a behavioural check distinguishes them. Everything under
-  **Does not work** applies to both.
-
   ### Works
 
-  - `get_artist_info` returns the artist. `top_tracks` is `[]` — Spotify withholds them.
+  - `get_artist` returns an `artists` **list**, not a single `artist`. `top_tracks` is `[]` —
+      Spotify withholds them. Reads up to 50 artists per request.
+  - `get_album` returns an `albums` **list**, not a single `album`. Reads up to 20 per request.
+  - `check_saved_tracks`, `check_saved_albums` and `check_following_artists` answer library
+      membership in one request instead of paging the library.
   - `search_music` accepts `limit` above 10 and returns 10 rows with `"limit": 10`.
-  - `get_track_info` accepts several IDs; three IDs return three tracks.
+  - `get_tracks` accepts several IDs; three IDs return three tracks.
   - `control_playback` returns live state: `play` gives `is_playing: true` with the track,
       `next` gives the new track.
   - `get_top_items` honours `limit` — 5 returns 5 artists, 10 returns 10.
-  - `get_playlist_info` reports a real `total_tracks`.
+  - `get_playlist` reports a real `total_tracks`.
 
   ### Does not work
 
-  - `get_user_playlists` returns `total_tracks: null` for every entry. Playlist size is not
+  - `list_playlists` returns `total_tracks: null` for every entry. Playlist size is not
       available from the list — page each playlist and count the rows returned.
   - `get_playlist_tracks` reports `total` as the returned page size, not the playlist length.
   - `search_music` can return `"total": 0` alongside populated `items` — a filtered search

@@ -1,9 +1,9 @@
 $kind: http-request
 name: Artist top tracks are withheld
 description: |-
-  Canary for the `get_artist_info` defect. This endpoint answers 403, which is
+  Canary for the `get_artist` defect. This endpoint answers 403, which is
   not one of `with_fallback`'s regime-miss statuses and has no alternative path,
-  so `get_artist_info` degrades to an empty `top_tracks` instead of failing.
+  so `get_artist` degrades to an empty `top_tracks` instead of failing.
 
   If this returns 200, that workaround can be removed and the tool can serve top
   tracks again.
@@ -17,7 +17,7 @@ scripts:
   - type: afterResponse
     code: |-
       pm.test(
-        "top-tracks still withheld (200 here means get_artist_info can stop degrading)",
+        "top-tracks still withheld (200 here means get_artist can stop degrading)",
         () => pm.response.to.have.status(403)
       );
 order: 5000

@@ -6,7 +6,7 @@ description: |-
   `total_tracks: 1`, released 2026-01-22 (`release_date_precision: day`), and the single
   track inline. `label`, `popularity` null and `genres` empty.
 
-  Contrast with `get_artist_info`: this tool also makes a second upstream call (for
+  Contrast with `get_artist`: this tool also makes a second upstream call (for
   tracks) but that one still works, so albums are fine where artists are not.
 transport: stdio
 command: uvx spotify-mcp-jamiew
@@ -18,7 +18,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "get_album_info",
+      "name": "get_album",
       "arguments": {
         "album_id": "7y8mOM5mWNSAean59dK3co"
       }

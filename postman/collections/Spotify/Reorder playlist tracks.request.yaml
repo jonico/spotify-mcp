@@ -18,7 +18,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "reorder_playlist_tracks",
+      "name": "reorder_playlist",
       "arguments": {
         "playlist_id": "4rtBfFS2LRXA7jFbLhyDjJ",
         "range_start": 1,

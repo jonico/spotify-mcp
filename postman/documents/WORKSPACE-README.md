@@ -6,12 +6,12 @@ git-synced from that repo; edit them in the repo, not in the UI.
 
 ## Collections
 
-### Spotify — 43 MCP requests + 4 AI workflow requests
+### Spotify — 46 MCP requests + 4 AI workflow requests
 
 Exercises the MCP server itself. Most requests are `mcp-request` items speaking JSON-RPC to
 `uvx spotify-mcp-jamiew` over stdio, and together they cover the server's whole surface:
-**25/25 tools, 6/6 resources, 5/5 prompts**. Each request records its purpose and the real
-response captured against v0.4.1.
+**28/28 tools, 6/6 resources, 5/5 prompts**. Each request records its purpose and the
+response it actually returns.
 
 Four `llm-request` items - **Queue Similar Tracks**, **Build Discovery Playlist**, **Resume
 Liked Songs** and **Clean Up Duplicate Tracks AI Request** - are genuine AI requests: a
@@ -109,24 +109,22 @@ Two things worth knowing before you trust a sync:
   replace an environment file with an older cloud copy. Check `git diff`, not just whether
   files were touched.
 
-## Server defects this workspace documents
+## Server behaviour this workspace documents
 
-Found while executing the requests, and recorded in the collection descriptions:
+Found while executing the requests, and recorded in the collection descriptions.
 
-- `get_artist_info` is **dead for every artist** — it calls `artist_top_tracks()`, which
-  returns 403 and is not routed through `with_fallback`. The `spotify://artist/{id}` resource
-  works because it omits that call.
-- `get_track_info` **cannot batch** — one ID works, two or more hit the withheld
-  `/v1/tracks?ids=` endpoint and fail.
-- `search_music` advertises `limit` up to 50, but anything above 10 is rejected with 400.
-- Playlist counts are unobtainable: `get_playlist_tracks` reports `total` as the page size,
-  and `total_tracks` comes back `null` from `get_user_playlists`, `get_playlist_info` and the
-  playlist resource.
-- `control_playback` can return an empty state on a successful `play` that had to wake an
-  idle device — read back with `get_playback_state`.
+Known limits:
 
-Fixes for the first four are open upstream as
-[#19](https://github.com/jamiew/spotify-mcp/pull/19),
-[#20](https://github.com/jamiew/spotify-mcp/pull/20),
-[#21](https://github.com/jamiew/spotify-mcp/pull/21) and
-[#22](https://github.com/jamiew/spotify-mcp/pull/22).
+- `list_playlists` returns `total_tracks: null` for every entry, so playlist size is not
+  available from the list — page each playlist and count the rows returned.
+- `get_playlist_tracks` reports `total` as the returned page size, not the playlist length.
+- `search_music` can return `total: 0` alongside populated `items`. Read `items`; never
+  branch on `total`.
+- `search_music` rejects `limit` above 10 on the wire; the tool retries at the cap rather
+  than failing.
+- Artist and user objects come back with `genres: []` and `popularity`/`followers` null.
+
+Five defects this workspace originally documented — `get_artist` dead for every artist,
+`get_tracks` unable to batch, the `search_music` limit rejection surfacing as an error,
+`get_playlist` reporting no count, and `control_playback` returning an empty state after
+waking an idle device — were fixed upstream and released.

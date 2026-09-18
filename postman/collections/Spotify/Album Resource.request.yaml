@@ -3,7 +3,7 @@ description: |-
   **Purpose:** album metadata via `spotify://album/{album_id}`.
 
   **Result:** album fields only — name, artist, release date/precision,
-  `total_tracks: 1`, `album_type: single`. No track list, unlike the `get_album_info`
+  `total_tracks: 1`, `album_type: single`. No track list, unlike the `get_album`
   tool.
 transport: stdio
 command: uvx spotify-mcp-jamiew

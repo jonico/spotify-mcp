@@ -4,7 +4,7 @@ description: |-
   `spotify://track/{track_id}`.
 
   **Result:** the full track JSON — same shape as one element of
-  `get_track_info`'s `tracks` array.
+  `get_tracks`'s `tracks` array.
 transport: stdio
 command: uvx spotify-mcp-jamiew
 env:

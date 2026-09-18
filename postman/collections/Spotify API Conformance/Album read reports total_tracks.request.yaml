@@ -2,7 +2,7 @@ $kind: http-request
 name: Album read reports total_tracks
 description: |-
   Albums still report their own counts, unlike playlists where `tracks.total` is
-  stripped. `get_album_info` also makes a second call for the track list and that
+  stripped. `get_album` also makes a second call for the track list and that
   one is not withheld, which is why albums work where artists do not.
 method: GET
 url: https://api.spotify.com/v1/albums/7y8mOM5mWNSAean59dK3co

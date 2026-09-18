@@ -1,7 +1,7 @@
 $kind: http-request
 name: Get playlist info
 description: |-
-  `GET /v1/playlists/{playlist_id}` - the call behind the `get_playlist_info` tool
+  `GET /v1/playlists/{playlist_id}` - the call behind the `get_playlist` tool
   (`spotify_client.playlist(fields="id,name,description,owner,public,tracks.total")`).
   Confirms the track count for the paginated walk in the next two steps.
 method: GET

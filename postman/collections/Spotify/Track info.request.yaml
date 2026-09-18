@@ -24,7 +24,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "get_track_info",
+      "name": "get_tracks",
       "arguments": {
         "track_ids": "6ADPS6h7kuqZwqekUrLTEp"
       }

@@ -1,0 +1,30 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** ask whether specific tracks are in the Liked Songs library, without
+  paging it. Takes up to 50 ids and answers in one request.
+
+  **Result:** one boolean per requested id, in the order asked. The two ids here are
+  the tracks the "Like track" request saves, so both read true once that has run.
+
+  Prefer this over walking `get_saved_tracks` when the question is membership rather
+  than contents — a large library costs many pages to answer the same thing.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "check_saved_tracks",
+      "arguments": {
+        "track_ids": ["6ADPS6h7kuqZwqekUrLTEp", "5LSKH85Ww52Jpg0UfSkUou"]
+      }
+    }
+  }
+settings:
+  version: auto
+  requestTimeout: 0
+order: 48000

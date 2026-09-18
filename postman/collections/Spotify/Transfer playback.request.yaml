@@ -31,8 +31,8 @@ description: |-
   need programmatic volume.
 
   Worth noting the error carries Spotify's own `reason`, which is what makes it
-  diagnosable. Compare the bare `playback_restricted` returned by `get_artist_info` and
-  by batched `get_track_info`, where no reason is supplied and the cause has to be
+  diagnosable. Compare the bare `playback_restricted` returned by `get_artist` and
+  by batched `get_tracks`, where no reason is supplied and the cause has to be
   inferred.
 transport: stdio
 command: uvx spotify-mcp-jamiew

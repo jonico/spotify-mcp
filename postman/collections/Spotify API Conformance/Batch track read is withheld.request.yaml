@@ -1,7 +1,7 @@
 $kind: http-request
 name: Batch track read is withheld
 description: |-
-  Canary for the `get_track_info` batching defect. `/v1/tracks?ids=` answers 403
+  Canary for the `get_tracks` batching defect. `/v1/tracks?ids=` answers 403
   while the single-track route works, so anything longer than one ID degrades to
   one request per track.
 

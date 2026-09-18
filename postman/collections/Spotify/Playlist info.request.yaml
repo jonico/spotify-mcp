@@ -19,7 +19,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "get_playlist_info",
+      "name": "get_playlist",
       "arguments": {
         "playlist_id": "4rtBfFS2LRXA7jFbLhyDjJ"
       }

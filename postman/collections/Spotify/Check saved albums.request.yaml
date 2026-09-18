@@ -1,0 +1,29 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** ask whether specific albums are saved in the library. Takes up to 20
+  ids and answers in one request.
+
+  **Result:** one boolean per requested id, in the order asked.
+
+  The 20-id ceiling is lower than the 50 for tracks and artists — Spotify sizes the
+  album batch route differently.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "check_saved_albums",
+      "arguments": {
+        "album_ids": ["7y8mOM5mWNSAean59dK3co", "7iud9UZ6rdQVWiEU3OrQKQ"]
+      }
+    }
+  }
+settings:
+  version: auto
+  requestTimeout: 0
+order: 48100

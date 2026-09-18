@@ -18,7 +18,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "get_user_playlists",
+      "name": "list_playlists",
       "arguments": {
         "limit": 20,
         "offset": 0

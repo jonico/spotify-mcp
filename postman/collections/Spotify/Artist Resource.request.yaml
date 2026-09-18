@@ -6,7 +6,7 @@ description: |-
   "5zbSsk4Qg514fYzb3KhQX7", "genres": [], "popularity": null, "followers": null}`.
 
   This is the direct contrast to "Artist Info Major Tom (does not work)": the resource
-  calls only `spotify_client.artist()`, while the `get_artist_info` tool additionally
+  calls only `spotify_client.artist()`, while the `get_artist` tool additionally
   calls the dead `artist_top_tracks()` and fails outright. Until that tool is fixed, this
   resource is the working way to resolve an artist.
 transport: stdio

@@ -13,7 +13,7 @@ message: |-
   {
     "method": "tools/call",
     "params": {
-      "name": "modify_playlist_details",
+      "name": "update_playlist_details",
       "arguments": {
         "playlist_id": "1SFakhKgD1SbrY6DeUKUZQ",
         "name": "My playlist #1 (renamed)",

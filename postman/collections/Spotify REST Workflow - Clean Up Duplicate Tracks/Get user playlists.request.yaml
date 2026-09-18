@@ -1,7 +1,7 @@
 $kind: http-request
 name: Get user playlists
 description: |-
-  `GET /v1/me/playlists` - the call behind the `get_user_playlists` tool
+  `GET /v1/me/playlists` - the call behind the `list_playlists` tool
   (`spotify_client.current_user_playlists()`). Picks the playlist with the most
   tracks as the cleanup target.
 method: GET

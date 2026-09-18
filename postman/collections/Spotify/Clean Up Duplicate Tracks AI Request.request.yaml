@@ -5,7 +5,7 @@ description: |-
   exact duplicate tracks from it, mirroring `analyze_large_playlist`'s pagination
   strategy but letting the model act on what it finds instead of only describing it.
 
-  Expects the model to chain `get_user_playlists` → `get_playlist_info` →
+  Expects the model to chain `list_playlists` → `get_playlist` →
   `get_playlist_tracks` (paginated, 100 at a time) → `remove_tracks_from_playlist`.
   The literal HTTP calls behind that sequence are pinned down in the sibling REST
   collection **Spotify REST Workflow - Clean Up Duplicate Tracks**.
@@ -29,7 +29,7 @@ userPrompts:
     Find my largest playlist and clean the exact duplicates out of it.
 
     Work out which playlist is biggest by paging its tracks - do not trust
-    `total_tracks` from `get_user_playlists` or `get_playlist_info`, which come back
+    `total_tracks` from `list_playlists` or `get_playlist`, which come back
     null for this app. Page with `get_playlist_tracks` 100 at a time until a page
     returns fewer rows than you asked for, and note that `total` echoes the page size
     rather than the playlist length, so count the rows you actually receive.
@@ -75,8 +75,8 @@ mcpConfig: |-
     }
   ]
 enabledTools:
-- get_user_playlists
-- get_playlist_info
+- list_playlists
+- get_playlist
 - get_playlist_tracks
 - remove_tracks_from_playlist
 clientTools: []

@@ -4,11 +4,11 @@ description: |-
   Spotify has withdrawn related-artists and `/recommendations` from third-party apps.
 
   **Result** (read from the prompt implementation): returns a template telling the
-  client to chain `get_artist_info` for genres → `search_music` with `genre:`/`year:`
+  client to chain `get_artist` for genres → `search_music` with `genre:`/`year:`
   filters → `get_top_items` to bias toward known taste, then return 8-10 artists with a
   representative track each.
 
-  Caveat worth knowing before relying on it: step 1 calls `get_artist_info`, which is
+  Caveat worth knowing before relying on it: step 1 calls `get_artist`, which is
   currently dead (see "Artist Info Major Tom"). Substitute the
   `spotify://artist/{id}` resource until that is fixed.
 transport: stdio
