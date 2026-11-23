@@ -1,0 +1,12 @@
+$kind: kafka-message
+topic: kt-multi-file-{{run_id}}
+key:
+  contentType: text
+  content: multi-2
+value:
+  contentType: text
+  content: file 2
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka multi-file/Kafka multi-file.yaml
+order: 2000

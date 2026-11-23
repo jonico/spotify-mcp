@@ -1,0 +1,6 @@
+$kind: kafka-message
+topic: kt-tombstone-{{run_id}}
+key:
+  contentType: text
+  content: gone
+order: 1000

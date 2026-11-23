@@ -1,0 +1,53 @@
+asyncapi: 3.0.0
+info:
+  title: Text event on partition 0 (Kafka Broker Tests)
+  version: 1.0.0
+  description: 'Topic written by Produce partition-timestamp: a text value sent to partition 0 with an explicit
+    message timestamp.'
+servers:
+  kafka:
+    host: '{{kafka_bootstrap}}'
+    protocol: kafka
+    description: A local single-node broker; kafka_bootstrap defaults to 127.0.0.1:9092.
+channels:
+  event:
+    address: kt-partition-timestamp-{{run_id}}
+    description: One topic per run.
+    messages:
+      event:
+        $ref: '#/components/messages/Event'
+operations:
+  sendEvent:
+    action: send
+    channel:
+      $ref: '#/channels/event'
+    summary: Produce the message (request Produce partition-timestamp)
+  receiveEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/event'
+    summary: Read the record back from the start of the topic (request Consume partition-timestamp)
+components:
+  messages:
+    Event:
+      name: Event
+      title: Text event on partition 0 (Kafka Broker Tests)
+      contentType: text/plain
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: A plain text key.
+            examples:
+            - ts-key
+      payload:
+        $ref: '#/components/schemas/EventPayload'
+      examples:
+      - name: example
+        payload: timed
+  schemas:
+    EventPayload:
+      type: string
+      description: A plain UTF-8 text value.
+      examples:
+      - timed

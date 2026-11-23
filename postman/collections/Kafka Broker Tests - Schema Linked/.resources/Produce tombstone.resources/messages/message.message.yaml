@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-tombstone-{{run_id}}
+key:
+  contentType: text
+  content: gone
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka tombstone/Kafka tombstone.yaml
+order: 1000

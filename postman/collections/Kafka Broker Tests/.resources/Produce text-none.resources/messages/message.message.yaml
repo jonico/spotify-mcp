@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-text-none-{{run_id}}
+key:
+  contentType: text
+  content: plain-key
+value:
+  contentType: text
+  content: hello kafka
+order: 1000

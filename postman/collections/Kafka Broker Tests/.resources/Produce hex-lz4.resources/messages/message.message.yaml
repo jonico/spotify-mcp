@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-hex-lz4-{{run_id}}
+key:
+  contentType: hex
+  content: 6f726465722d33
+value:
+  contentType: hex
+  content: 68656c6c6f
+order: 1000

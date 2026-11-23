@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-base64-snappy-{{run_id}}
+key:
+  contentType: base64
+  content: b3JkZXItNA==
+value:
+  contentType: base64
+  content: eyJpZCI6IDR9
+order: 1000

@@ -1,0 +1,18 @@
+$kind: kafka-request
+description: "**Variant:** hex key and value, lz4, acks all. Produces one message to `kt-hex-lz4-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: lz4
+messages: ./.resources/Produce hex-lz4.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("hex key and value, lz4, acks all: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("hex key and value, lz4, acks all: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-hex-lz4-" + pm.collectionVariables.get("run_id")); });
+      pm.test("hex key and value, lz4, acks all: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("hex key and value, lz4, acks all: broker returns a numeric offset", function () { pm.expect(r.offset).to.match(/^\d+$/); });
+order: 5000

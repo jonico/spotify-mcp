@@ -1,0 +1,68 @@
+asyncapi: '3.0.0'
+info:
+  title: Order events (Kafka Broker Tests)
+  version: '1.0.0'
+  description: |
+    The topic written by the Produce json-gzip request and read back by Consume json-gzip in the
+    Kafka Broker Tests collection. Each run creates a fresh topic, named from the run_id variable
+    that the first request generates, so one run never reads another run's records.
+servers:
+  kafka:
+    host: "{{kafka_bootstrap}}"
+    protocol: kafka
+    description: A local single-node broker; kafka_bootstrap defaults to 127.0.0.1:9092.
+channels:
+  event:
+    address: "kt-json-gzip-{{run_id}}"
+    description: One topic per run, one record per run.
+    messages:
+      event:
+        $ref: '#/components/messages/Event'
+operations:
+  sendEvent:
+    action: send
+    channel:
+      $ref: '#/channels/event'
+    summary: Produce an order event to the topic (request Produce json-gzip, gzip compression, acks all)
+  receiveEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/event'
+    summary: Read the order event back from the start of the topic (request Consume json-gzip)
+components:
+  messages:
+    Event:
+      name: Event
+      title: Order created
+      contentType: application/json
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: The order key, a plain text string such as order-1.
+            examples:
+              - order-1
+      payload:
+        $ref: '#/components/schemas/EventPayload'
+      examples:
+        - name: created
+          payload:
+            id: 1
+            status: created
+  schemas:
+    EventPayload:
+      type: object
+      description: The order event that the Produce json-gzip request sends.
+      required:
+        - id
+        - status
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the order
+        status:
+          type: string
+          description: Lifecycle state of the order
+          examples:
+            - created

@@ -1,0 +1,30 @@
+$kind: kafka-request
+description: |-
+  **Variant:** hex key and value, lz4, acks all. Reads the record back from the start of the topic.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-hex-lz4-{{run_id}}
+startPosition:
+  type: beginning
+stopAfter:
+  maxRecords: 1
+  maxDurationMs: 20000
+scripts:
+  - type: onIncomingMessage
+    code: |-
+      const m = pm.message;
+      pm.test("hex key and value, lz4, acks all: record comes from the variant's topic, partition and offset 0", function () {
+        pm.expect(m.topic).to.equal("kt-hex-lz4-" + pm.collectionVariables.get("run_id"));
+        pm.expect(m.partition).to.be.a("number");
+        pm.expect(m.offset).to.equal("0");
+      });
+      pm.test("hex key and value, lz4, acks all: key round-trips", function () { pm.expect(m.key).to.equal("order-3"); });
+      pm.test("hex key and value, lz4, acks all: value round-trips", function () { pm.expect(m.value).to.deep.equal("hello"); });
+      pm.test("hex key and value, lz4, acks all: record has a broker timestamp", function () { pm.expect(m.timestamp).to.be.a("number").above(0); });
+  - type: afterConsume
+    code: |-
+      pm.test("hex key and value, lz4, acks all: consume stops because maxRecords was reached", function () { pm.expect(pm.response.reason).to.equal("maxRecords"); });
+      pm.test("hex key and value, lz4, acks all: exactly one record was received", function () { pm.expect(pm.response.messages.members).to.have.lengthOf(1); });
+order: 6000

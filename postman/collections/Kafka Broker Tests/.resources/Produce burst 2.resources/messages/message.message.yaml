@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-burst-{{run_id}}
+key:
+  contentType: text
+  content: burst-2
+value:
+  contentType: json
+  content: '{"seq": 2}'
+order: 1000

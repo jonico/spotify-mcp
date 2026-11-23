@@ -1,0 +1,18 @@
+$kind: kafka-request
+description: "**Variant:** json value, zstd, acks none. Produces one message to `kt-json-zstd-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: none
+settings:
+  compression: zstd
+messages: ./.resources/Produce json-zstd.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("json value, zstd, acks none: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("json value, zstd, acks none: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-json-zstd-" + pm.collectionVariables.get("run_id")); });
+      pm.test("json value, zstd, acks none: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("json value, zstd, acks none: KNOWN QUIRK: with acks none no offset is known, so the CLI reports -1001", function () { pm.expect(r.offset).to.equal("-1001"); });
+order: 9000

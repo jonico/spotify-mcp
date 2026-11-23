@@ -1,0 +1,19 @@
+$kind: kafka-request
+description: "**Variant:** explicit partition 0 and timestamp. Produces one message to `kt-partition-timestamp-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: gzip
+messages: ./.resources/Produce partition-timestamp.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("explicit partition 0 and timestamp: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("explicit partition 0 and timestamp: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-partition-timestamp-" + pm.collectionVariables.get("run_id")); });
+      pm.test("explicit partition 0 and timestamp: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("explicit partition 0 and timestamp: broker returns a numeric offset", function () { pm.expect(r.offset).to.match(/^\d+$/); });
+      pm.test("explicit partition 0 and timestamp: honours the requested partition", function () { pm.expect(r.partition).to.equal(0); });
+order: 13000

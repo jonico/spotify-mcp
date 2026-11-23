@@ -1,0 +1,53 @@
+asyncapi: 3.0.0
+info:
+  title: Hex encoded event (Kafka Broker Tests)
+  version: 1.0.0
+  description: Topic written by Produce hex-lz4. The key and value are authored as hex; the bytes are UTF-8 text,
+    so a consumer sees the decoded text.
+servers:
+  kafka:
+    host: '{{kafka_bootstrap}}'
+    protocol: kafka
+    description: A local single-node broker; kafka_bootstrap defaults to 127.0.0.1:9092.
+channels:
+  event:
+    address: kt-hex-lz4-{{run_id}}
+    description: One topic per run.
+    messages:
+      event:
+        $ref: '#/components/messages/Event'
+operations:
+  sendEvent:
+    action: send
+    channel:
+      $ref: '#/channels/event'
+    summary: Produce the message (request Produce hex-lz4)
+  receiveEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/event'
+    summary: Read the record back from the start of the topic (request Consume hex-lz4)
+components:
+  messages:
+    Event:
+      name: Event
+      title: Hex encoded event (Kafka Broker Tests)
+      contentType: application/octet-stream
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: UTF-8 text, authored as hex (6f726465722d33).
+            examples:
+            - order-3
+      payload:
+        $ref: '#/components/schemas/EventPayload'
+      examples:
+      - name: example
+        payload: hello
+  schemas:
+    EventPayload:
+      type: string
+      description: UTF-8 text, authored as hex (68656c6c6f); consumers see the decoded text.
+      examples:
+      - hello

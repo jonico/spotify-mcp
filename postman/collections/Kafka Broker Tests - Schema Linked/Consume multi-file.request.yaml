@@ -1,0 +1,26 @@
+$kind: kafka-request
+description: |-
+  **Variant:** reads the multi-file topic until it goes idle.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-multi-file-{{run_id}}
+    schema:
+      source: specification
+      specificationId: ../postman/specs/Kafka multi-file/Kafka multi-file.yaml
+startPosition:
+  type: beginning
+stopAfter:
+  maxRecords: 2
+  idleMs: 8000
+  maxDurationMs: 20000
+scripts:
+  - type: afterConsume
+    code: |-
+      pm.test("multi-file: KNOWN QUIRK: only one of the two message files was sent", function () {
+        pm.expect(pm.response.messages.members).to.have.lengthOf(1);
+        pm.expect(pm.response.messages.members[0].key).to.equal("multi-1");
+      });
+      pm.test("multi-file: the consume ended on the idle timer, not maxRecords", function () { pm.expect(pm.response.reason).to.not.equal("maxRecords"); });
+order: 20000

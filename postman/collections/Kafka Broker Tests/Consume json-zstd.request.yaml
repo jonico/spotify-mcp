@@ -1,0 +1,30 @@
+$kind: kafka-request
+description: |-
+  **Variant:** json value, zstd, acks none. Reads the record back from the start of the topic.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-json-zstd-{{run_id}}
+startPosition:
+  type: beginning
+stopAfter:
+  maxRecords: 1
+  maxDurationMs: 20000
+scripts:
+  - type: onIncomingMessage
+    code: |-
+      const m = pm.message;
+      pm.test("json value, zstd, acks none: record comes from the variant's topic, partition and offset 0", function () {
+        pm.expect(m.topic).to.equal("kt-json-zstd-" + pm.collectionVariables.get("run_id"));
+        pm.expect(m.partition).to.be.a("number");
+        pm.expect(m.offset).to.equal("0");
+      });
+      pm.test("json value, zstd, acks none: key round-trips", function () { pm.expect(m.key).to.equal("order-5"); });
+      pm.test("json value, zstd, acks none: value round-trips", function () { pm.expect(m.value).to.deep.equal({"id": 5, "items": [1, 2, 3]}); });
+      pm.test("json value, zstd, acks none: record has a broker timestamp", function () { pm.expect(m.timestamp).to.be.a("number").above(0); });
+  - type: afterConsume
+    code: |-
+      pm.test("json value, zstd, acks none: consume stops because maxRecords was reached", function () { pm.expect(pm.response.reason).to.equal("maxRecords"); });
+      pm.test("json value, zstd, acks none: exactly one record was received", function () { pm.expect(pm.response.messages.members).to.have.lengthOf(1); });
+order: 10000

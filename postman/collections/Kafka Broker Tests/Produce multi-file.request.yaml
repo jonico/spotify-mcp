@@ -1,0 +1,15 @@
+$kind: kafka-request
+description: |-
+  **Variant:** one producer request that owns two message files. Observed: it sends one record per run,
+  the first file, not both.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: none
+messages: ./.resources/Produce multi-file.resources/messages
+scripts:
+  - type: afterProduce
+    code: 'pm.test("multi-file: produced without error", function () { pm.expect(pm.response.error, "error").to.equal(undefined); });'
+order: 19000

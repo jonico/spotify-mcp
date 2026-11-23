@@ -1,0 +1,25 @@
+$kind: kafka-request
+description: |-
+  **Variant:** starts at the end of the (already populated) json-gzip topic, so nothing new arrives and
+  the consume ends on the idle timer instead of `maxRecords`.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-json-gzip-{{run_id}}
+    schema:
+      source: specification
+      specificationId: ../postman/specs/Kafka json-gzip/Kafka json-gzip.yaml
+startPosition:
+  type: end
+stopAfter:
+  maxRecords: 5
+  idleMs: 8000
+  maxDurationMs: 20000
+scripts:
+  - type: afterConsume
+    code: |-
+      pm.test("from end: no record is received", function () { pm.expect(pm.response.messages.members).to.have.lengthOf(0); });
+      pm.test("from end: consume does not end on maxRecords", function () { pm.expect(pm.response.reason).to.not.equal("maxRecords"); });
+      pm.test("from end: reason is reported", function () { pm.expect(pm.response.reason).to.be.a("string").and.not.empty; });
+order: 21000

@@ -1,0 +1,69 @@
+asyncapi: 3.0.0
+info:
+  title: Order with items (Kafka Broker Tests)
+  version: 1.0.0
+  description: 'Topic written by Produce json-zstd: a JSON order with a list of item numbers, zstd compression,
+    acks none.'
+servers:
+  kafka:
+    host: '{{kafka_bootstrap}}'
+    protocol: kafka
+    description: A local single-node broker; kafka_bootstrap defaults to 127.0.0.1:9092.
+channels:
+  event:
+    address: kt-json-zstd-{{run_id}}
+    description: One topic per run.
+    messages:
+      event:
+        $ref: '#/components/messages/Event'
+operations:
+  sendEvent:
+    action: send
+    channel:
+      $ref: '#/channels/event'
+    summary: Produce the message (request Produce json-zstd)
+  receiveEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/event'
+    summary: Read the record back from the start of the topic (request Consume json-zstd)
+components:
+  messages:
+    Event:
+      name: Event
+      title: Order with items (Kafka Broker Tests)
+      contentType: application/json
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: The order key, a plain text string.
+            examples:
+            - order-5
+      payload:
+        $ref: '#/components/schemas/EventPayload'
+      examples:
+      - name: example
+        payload:
+          id: 5
+          items:
+          - 1
+          - 2
+          - 3
+  schemas:
+    EventPayload:
+      type: object
+      description: An order and its item numbers.
+      required:
+      - id
+      - items
+      additionalProperties: false
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the order
+        items:
+          type: array
+          description: Item numbers on the order
+          items:
+            type: integer

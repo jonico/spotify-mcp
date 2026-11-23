@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-json-zstd-{{run_id}}
+key:
+  contentType: text
+  content: order-5
+value:
+  contentType: json
+  content: '{"id": 5, "items": [1, 2, 3]}'
+order: 1000

@@ -1,0 +1,36 @@
+$kind: kafka-request
+description: |-
+  **Variant:** reads the three burst records. `onIncomingMessage` collects each record so the test can
+  check it ran once per record.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-burst-{{run_id}}
+    schema:
+      source: specification
+      specificationId: ../postman/specs/Kafka burst/Kafka burst.yaml
+startPosition:
+  type: beginning
+stopAfter:
+  maxRecords: 3
+  maxDurationMs: 20000
+scripts:
+  - type: beforeConsume
+    code: |-
+      pm.collectionVariables.set("burst_seen", "");
+  - type: onIncomingMessage
+    code: |-
+      const seen = pm.collectionVariables.get("burst_seen") ? JSON.parse(pm.collectionVariables.get("burst_seen")) : [];
+      seen.push({ offset: pm.message.offset, key: pm.message.key, value: pm.message.value });
+      pm.collectionVariables.set("burst_seen", JSON.stringify(seen));
+  - type: afterConsume
+    code: |-
+      const members = pm.response.messages.members;
+      pm.test("burst: all three messages arrive", function () { pm.expect(members).to.have.lengthOf(3); });
+      pm.test("burst: offsets are consecutive from 0", function () { pm.expect(members.map(function (m) { return m.offset; })).to.deep.equal(["0", "1", "2"]); });
+      pm.test("burst: records keep the produce order", function () { pm.expect(members.map(function (m) { return m.key; })).to.deep.equal(["burst-1", "burst-2", "burst-3"]); });
+      pm.test("burst: values carry their sequence numbers", function () { pm.expect(members.map(function (m) { return m.value.seq; })).to.deep.equal([1, 2, 3]); });
+      pm.test("burst: onIncomingMessage ran once per record", function () { pm.expect(JSON.parse(pm.collectionVariables.get("burst_seen"))).to.have.lengthOf(3); });
+      pm.test("burst: consume stopped at maxRecords", function () { pm.expect(pm.response.reason).to.equal("maxRecords"); });
+order: 18000

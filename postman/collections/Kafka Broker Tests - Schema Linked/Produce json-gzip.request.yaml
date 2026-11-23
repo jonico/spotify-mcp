@@ -1,0 +1,20 @@
+$kind: kafka-request
+description: "**Variant:** json value, gzip, acks all. Produces one message to `kt-json-gzip-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: gzip
+messages: ./.resources/Produce json-gzip.resources/messages
+scripts:
+  - type: beforeProduce
+    code: pm.collectionVariables.set("run_id", Date.now().toString(36) + Math.random().toString(36).slice(2, 6));
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("json value, gzip, acks all: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("json value, gzip, acks all: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-json-gzip-" + pm.collectionVariables.get("run_id")); });
+      pm.test("json value, gzip, acks all: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("json value, gzip, acks all: broker returns a numeric offset", function () { pm.expect(r.offset).to.match(/^\d+$/); });
+order: 1000

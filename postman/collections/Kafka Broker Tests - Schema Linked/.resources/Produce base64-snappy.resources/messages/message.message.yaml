@@ -1,0 +1,12 @@
+$kind: kafka-message
+topic: kt-base64-snappy-{{run_id}}
+key:
+  contentType: base64
+  content: b3JkZXItNA==
+value:
+  contentType: base64
+  content: eyJpZCI6IDR9
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka base64-snappy/Kafka base64-snappy.yaml
+order: 1000

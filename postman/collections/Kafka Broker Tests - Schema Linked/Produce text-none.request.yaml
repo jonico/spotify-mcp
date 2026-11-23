@@ -1,0 +1,18 @@
+$kind: kafka-request
+description: "**Variant:** text value, no compression, acks leader. Produces one message to `kt-text-none-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: leader
+settings:
+  compression: none
+messages: ./.resources/Produce text-none.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("text value, no compression, acks leader: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("text value, no compression, acks leader: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-text-none-" + pm.collectionVariables.get("run_id")); });
+      pm.test("text value, no compression, acks leader: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("text value, no compression, acks leader: broker returns a numeric offset", function () { pm.expect(r.offset).to.match(/^\d+$/); });
+order: 3000

@@ -1,0 +1,61 @@
+asyncapi: 3.0.0
+info:
+  title: Base64 encoded event (Kafka Broker Tests)
+  version: 1.0.0
+  description: Topic written by Produce base64-snappy. The value is authored as base64 of a JSON object; a consumer
+    sees the decoded object.
+servers:
+  kafka:
+    host: '{{kafka_bootstrap}}'
+    protocol: kafka
+    description: A local single-node broker; kafka_bootstrap defaults to 127.0.0.1:9092.
+channels:
+  event:
+    address: kt-base64-snappy-{{run_id}}
+    description: One topic per run.
+    messages:
+      event:
+        $ref: '#/components/messages/Event'
+operations:
+  sendEvent:
+    action: send
+    channel:
+      $ref: '#/channels/event'
+    summary: Produce the message (request Produce base64-snappy)
+  receiveEvent:
+    action: receive
+    channel:
+      $ref: '#/channels/event'
+    summary: Read the record back from the start of the topic (request Consume base64-snappy)
+components:
+  messages:
+    Event:
+      name: Event
+      title: Base64 encoded event (Kafka Broker Tests)
+      contentType: application/json
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: UTF-8 text, authored as base64 (b3JkZXItNA==).
+            examples:
+            - order-4
+      payload:
+        $ref: '#/components/schemas/EventPayload'
+      examples:
+      - name: example
+        payload:
+          id: 4
+  schemas:
+    EventPayload:
+      description: Either the base64 text as authored, or the JSON object it decodes to.
+      oneOf:
+      - type: string
+        description: The base64 text as authored.
+      - type: object
+        required:
+        - id
+        additionalProperties: false
+        properties:
+          id:
+            type: integer

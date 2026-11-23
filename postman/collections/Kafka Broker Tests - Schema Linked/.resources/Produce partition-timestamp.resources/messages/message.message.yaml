@@ -1,0 +1,14 @@
+$kind: kafka-message
+topic: kt-partition-timestamp-{{run_id}}
+key:
+  contentType: text
+  content: ts-key
+value:
+  contentType: text
+  content: timed
+partition: 0
+timestamp: 1700000000000
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka partition-timestamp/Kafka partition-timestamp.yaml
+order: 1000

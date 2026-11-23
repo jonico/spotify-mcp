@@ -1,0 +1,38 @@
+$kind: collection
+description: |-
+  **This is the schema-linked variant, for the Postman app.** Every producer message links to an
+  AsyncAPI spec in `postman/specs` (`Kafka json-gzip`, `Kafka text-none`, ...), which describes its topic,
+  key and payload. Run it from the app. `postman collection run` (CLI 1.93.1) fails every producer in it
+  with "Kafka schema encoding is not yet supported", and the consumers then read empty topics; use the
+  sibling collection `Kafka Broker Tests` for CLI and CI runs. Each consumer links, on its topic entry, to
+  the spec of the topic it reads (the shape the Postman app writes).
+
+  Round-trip tests for `kafka-request` against a local Kafka broker: each producer variant writes one
+  or more messages to its own topic and a consumer reads them back and asserts on them.
+
+  **Run** (needs a broker on `{{kafka_bootstrap}}`, default `127.0.0.1:9092`, and Postman CLI >= 1.93.1):
+
+  ```
+  docker run -d --name kafka-probe -p 127.0.0.1:9092:9092 apache/kafka:latest
+  postman collection run "postman/collections/Kafka Broker Tests - Schema Linked" --no-report-events
+  postman collection run "postman/collections/Kafka Broker Tests - Schema Linked" --no-report-events -n 3   # repeat: checks stability
+  ```
+
+  Every run generates a fresh `run_id` in the first request, and every topic is named
+  `kt-<variant>-<run_id>`, so a run never reads records written by an earlier one and the broker
+  needs no cleanup. Variability covers payload encoding (`text`, `json`, `hex`, `base64`), all five
+  compression codecs, the three acknowledgement levels, a tombstone (no value), an explicit partition
+  and timestamp, a three-message burst, and a consumer that starts at the end of a topic.
+
+  ## What the hooks expose (verified on CLI 1.93.1)
+
+  - `afterProduce`: `pm.response` is `{topic, partition, offset (string), key, value, error, reason, messages}`.
+  - `onIncomingMessage`: `pm.message` is `{topic, partition, offset (string), timestamp, key, value, headers}`.
+  - `afterConsume`: `pm.response.reason` says why the consume ended (`maxRecords`, ...) and
+    `pm.response.messages.members` holds every record received.
+  - `beforeProduce` and `beforeConsume` run before the connection is used; `pm.request` carries the
+    merged request fields.
+variables:
+  kafka_bootstrap: 127.0.0.1:9092
+  run_id: ""
+  burst_seen: ""

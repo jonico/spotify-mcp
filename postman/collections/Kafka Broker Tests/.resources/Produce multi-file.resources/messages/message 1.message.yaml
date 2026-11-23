@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-multi-file-{{run_id}}
+key:
+  contentType: text
+  content: multi-1
+value:
+  contentType: text
+  content: file 1
+order: 1000

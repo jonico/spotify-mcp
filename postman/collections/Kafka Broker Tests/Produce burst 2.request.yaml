@@ -1,0 +1,15 @@
+$kind: kafka-request
+description: "**Variant:** burst message 2 of 3, all to the same topic."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: none
+messages: ./.resources/Produce burst 2.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      pm.test("burst 2: produced without error", function () { pm.expect(pm.response.error, "error").to.equal(undefined); });
+      pm.test("burst 2: gets offset 1", function () { pm.expect(pm.response.offset).to.equal("1"); });
+order: 16000

@@ -1,0 +1,37 @@
+$kind: kafka-request
+description: |-
+  **Variant:** explicit partition 0 and timestamp. Reads the record back from the start of the topic.
+mode: consumer
+url:
+  - "{{kafka_bootstrap}}"
+topics:
+  - name: kt-partition-timestamp-{{run_id}}
+    schema:
+      source: specification
+      specificationId: ../postman/specs/Kafka partition-timestamp/Kafka partition-timestamp.yaml
+startPosition:
+  type: beginning
+stopAfter:
+  maxRecords: 1
+  maxDurationMs: 20000
+scripts:
+  - type: onIncomingMessage
+    code: |-
+      const m = pm.message;
+      pm.test("explicit partition 0 and timestamp: record comes from the variant's topic, partition and offset 0", function () {
+        pm.expect(m.topic).to.equal("kt-partition-timestamp-" + pm.collectionVariables.get("run_id"));
+        pm.expect(m.partition).to.be.a("number");
+        pm.expect(m.offset).to.equal("0");
+      });
+      pm.test("explicit partition 0 and timestamp: key round-trips", function () { pm.expect(m.key).to.equal("ts-key"); });
+      pm.test("explicit partition 0 and timestamp: value round-trips", function () { pm.expect(m.value).to.deep.equal("timed"); });
+      pm.test("explicit partition 0 and timestamp: record has a broker timestamp", function () { pm.expect(m.timestamp).to.be.a("number").above(0); });
+      pm.test("explicit partition 0 and timestamp: KNOWN QUIRK: the message timestamp is not applied, the record carries the send time", function () {
+        pm.expect(m.timestamp).to.not.equal(1700000000000);
+        pm.expect(Math.abs(Date.now() - m.timestamp)).to.be.below(300000);
+      });
+  - type: afterConsume
+    code: |-
+      pm.test("explicit partition 0 and timestamp: consume stops because maxRecords was reached", function () { pm.expect(pm.response.reason).to.equal("maxRecords"); });
+      pm.test("explicit partition 0 and timestamp: exactly one record was received", function () { pm.expect(pm.response.messages.members).to.have.lengthOf(1); });
+order: 14000

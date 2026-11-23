@@ -1,0 +1,18 @@
+$kind: kafka-request
+description: "**Variant:** tombstone: a key and no value. Produces one message to `kt-tombstone-{{run_id}}`."
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+settings:
+  compression: none
+messages: ./.resources/Produce tombstone.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      pm.test("tombstone: a key and no value: produced without error", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("tombstone: a key and no value: lands on the variant's topic", function () { pm.expect(r.topic).to.equal("kt-tombstone-" + pm.collectionVariables.get("run_id")); });
+      pm.test("tombstone: a key and no value: broker returns a partition", function () { pm.expect(r.partition).to.be.a("number"); });
+      pm.test("tombstone: a key and no value: broker returns a numeric offset", function () { pm.expect(r.offset).to.match(/^\d+$/); });
+order: 11000

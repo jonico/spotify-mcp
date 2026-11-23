@@ -1,0 +1,9 @@
+$kind: kafka-message
+topic: kt-json-gzip-{{run_id}}
+key:
+  contentType: text
+  content: order-1
+value:
+  contentType: json
+  content: '{"id": 1, "status": "created"}'
+order: 1000
