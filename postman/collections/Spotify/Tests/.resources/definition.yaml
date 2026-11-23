@@ -1,0 +1,6 @@
+$kind: collection
+description: |-
+  Read-only checks that never change the Spotify account: the server contract, negative cases,
+  a value chained between two requests, and the tools added after the first 28. Run just this
+  folder with `postman collection run postman/collections/Spotify -i Tests --allow-stdio -e <env>`.
+order: 200000

@@ -1,0 +1,27 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** `follow_artists`; it changes the live account.
+
+  **Result:** Not executed. Documented only, as the other mutating requests in this collection are.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "follow_artists",
+      "arguments": {
+        "artist_ids": [
+          "5zbSsk4Qg514fYzb3KhQX7"
+        ]
+      }
+    }
+  }
+settings:
+  version: auto
+  requestTimeout: 0
+order: 100000

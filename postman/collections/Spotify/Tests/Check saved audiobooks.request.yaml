@@ -1,0 +1,41 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** library membership for an audiobook id. A well-formed id that does not exist reads `false`.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "check_saved_audiobooks",
+      "arguments": {
+        "audiobook_ids": [
+          "0000000000000000000000"
+        ]
+      }
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      const asked = ["0000000000000000000000"];
+      pm.test("results maps every requested id to a boolean", function () {
+        pm.expect(sc.results).to.be.an("object");
+        asked.forEach(function (id) { pm.expect(sc.results[id], id).to.be.a("boolean"); });
+      });
+      pm.test("checked equals the number of ids", function () { pm.expect(sc.checked).to.equal(Object.keys(sc.results).length); });
+      pm.test("a non-existent id is reported as not saved", function () { pm.expect(sc.results["0000000000000000000000"]).to.equal(false); });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 18000

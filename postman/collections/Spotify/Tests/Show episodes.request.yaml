@@ -1,0 +1,44 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** list a show's episodes (a public show id, so the result does not depend on the account).
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "get_show_episodes",
+      "arguments": {
+        "show_id": "4rOoJ6Egrf8K2IrywzwOMk",
+        "limit": 3,
+        "offset": 0
+      }
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("page carries total, limit and offset", function () {
+        pm.expect(sc.items).to.be.an("array");
+        pm.expect(sc.total).to.be.a("number");
+        pm.expect(sc.limit).to.be.a("number");
+        pm.expect(sc.offset).to.be.a("number");
+      });
+      pm.test("returns at most three episodes, each with id, name and duration_ms", function () {
+        pm.expect(sc.items.length).to.be.within(1, 3);
+        sc.items.forEach(function (e) { pm.expect(e.id).to.be.a("string"); pm.expect(e.name).to.be.a("string"); pm.expect(e.duration_ms).to.be.a("number"); });
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 15000

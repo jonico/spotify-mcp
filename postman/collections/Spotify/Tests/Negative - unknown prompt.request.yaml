@@ -1,0 +1,33 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** a prompt the server does not have. **Observed:** protocol error -32603 `Internal server error`, where -32602 (invalid params) would be more precise; the quirk test flips when upstream changes it.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "prompts/get",
+    "params": {
+      "name": "no_such_prompt",
+      "arguments": {}
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const err = pm.response.error;
+      pm.test("unknown prompt is a protocol error", function () {
+        pm.expect(pm.response.result, "result").to.equal(undefined);
+        pm.expect(err.kind).to.equal("protocol");
+        pm.expect(err.code, "code").to.be.a("number").below(0);
+      });
+      pm.test("KNOWN QUIRK: the server answers -32603 Internal server error (-32602 would be the precise code)", function () {
+        pm.expect(err.code).to.equal(-32603);
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 5000

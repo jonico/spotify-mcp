@@ -1,0 +1,38 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** read back the track whose id **Chain 1** stored in `chained_track_id`.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "get_tracks",
+      "arguments": {
+        "track_ids": [
+          "{{chained_track_id}}"
+        ]
+      }
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("get_tracks returns the track found by Chain 1", function () {
+        pm.expect(sc.tracks).to.be.an("array").with.lengthOf(1);
+        pm.expect(sc.tracks[0].id).to.equal(pm.collectionVariables.get("chained_track_id"));
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 7000

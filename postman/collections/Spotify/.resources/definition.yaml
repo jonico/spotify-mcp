@@ -2,7 +2,7 @@ $kind: collection
 description: |-
   Spotify MCP collection for playback control, content discovery, playlist browsing, and  
   user/library actions. Every request is an **AI (MCP) request** speaking JSON-RPC to  
-  `uvx spotify-mcp-jamiew` over stdio, covering all 28 tools, 6 resources and 5 prompts the  
+  `uvx spotify-mcp-jamiew` over stdio, covering all 48 tools, 6 resources and 5 prompts the  
   server exposes.
 
   Credentials come from the **Spotify MCP** environment (`{{SPOTIFY_CLIENT_ID}}`,  
@@ -13,7 +13,7 @@ description: |-
 
   | Surface | Covered | Notes |
   | --- | --- | --- |
-  | Tools | 28 / 28 | 8 pre-existing, 20 added |
+  | Tools | 48 / 48 | 28 earlier; 9 read-only added in `Tests/`; 11 mutating added, not executed |
   | Resources | 6 / 6 | 1 pre-existing, 5 added |
   | Prompts | 5 / 5 | 2 pre-existing, 3 added |
 
@@ -41,6 +41,11 @@ description: |-
       `next` gives the new track.
   - `get_top_items` honours `limit` — 5 returns 5 artists, 10 returns 10.
   - `get_playlist` reports a real `total_tracks`.
+  - `check_following_artists` answers on server 0.9.2 (verified 2026-11-23): `results`, a map of
+      artist id to boolean, plus `checked`. It failed with `playback_restricted` on earlier
+      servers, so the old failure is no longer expected.
+  - `get_artist` and `get_album` take `artist_ids` / `album_ids` (lists) on 0.9.2. The singular
+      `artist_id` / `album_id` these requests used to send now fail argument validation.
 
   ### Does not work
 
@@ -51,12 +56,43 @@ description: |-
       (`query: "I got that"`, `artist: "Kotorri"`) returned three tracks with `total` zero.
       Read `items`; never branch on `total`.
   - Artist and user objects come back with `genres: []` and `popularity`/`followers` null.
-  - `check_following_artists` fails with `playback_restricted` for any input, single id or
-      list. The follow-check route is withheld from this app; the saved-tracks and
-      saved-albums equivalents work.
   - `add_tracks_to_playlist` takes `track_uris`, not `track_ids`.
   - Field filters inside `query` (`artist:Name`) are not honoured; use the `artist`, `album`,
       `year` and `genre` parameters instead.
+
+  ## Tests
+
+  Every `mcp-request` that can run without changing the account carries `scripts` with
+  `afterResponse` assertions; the new read-only work lives in the `Tests/` folder. Verified on
+  Postman CLI 1.93.1 against server 0.9.2 (2026-11-23).
+
+  ```
+  postman collection run postman/collections/Spotify -i Tests --allow-stdio -e <environment>
+  postman collection run "postman/collections/Spotify/Search.request.yaml" --allow-stdio -e <environment>
+  ```
+
+  - `--allow-stdio` is required: the CLI refuses to start the local `uvx` server otherwise.
+  - The CLI cannot read Postman Vault. Give `-e` an environment file holding real values for
+    `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REDIRECT_URI`, kept outside git, and
+    run from this repository so spotipy finds its `.cache` token file.
+  - **Do not run the whole collection.** Requests that change playback or the library
+    (`control_playback`, `save_tracks`, `transfer_playback`, `remove_tracks_from_playlist`, the
+    follow/save/remove requests) and the `llm-request` items would run too. Run `-i Tests` or a
+    single request file.
+  - Hooks are `beforeConnect`, `afterConnect`, `afterResponse` and `afterDisconnect`.
+    `afterResponse` runs for `tools/call`, `prompts/get` and `resources/read` only, not for the
+    `*/list` methods. For those, assert in `afterConnect`: its `pm.response` carries `tools`,
+    `prompts`, `resources`, `resourceTemplates`, `capabilities`, `instructions` and `failures`.
+    See **Server contract**.
+  - In `afterResponse`, `pm.response` is `{method, result, responseTime}` (or `{method, error}` for
+    a protocol error): read `pm.response.result.structuredContent`, `.content`, `.isError`. There
+    is no `.json()`. A tool failure is `result.isError: true`; an unknown resource or prompt is a
+    protocol `error` with a `code`.
+  - Never log `pm.request` in `afterConnect`: it holds the resolved credentials.
+  - Each request opens its own server process (about a second); `pm.collectionVariables` set in
+    one script is visible to later requests, which is how **Chain 1** feeds **Chain 2**.
+  - Tests named `KNOWN QUIRK` pin an upstream defect; they fail when it is fixed, which is the
+    cue to update the notes above.
 
   ## AI Workflow Requests
 

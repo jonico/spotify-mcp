@@ -1,0 +1,31 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** `get_tracks` without `track_ids`. **Expected:** `isError: true` and a validation error naming `track_ids`.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "get_tracks",
+      "arguments": {}
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const text = res.content && res.content[0] ? String(res.content[0].text) : "";
+      pm.test("missing required argument is a validation error", function () {
+        pm.expect(res.isError).to.equal(true);
+        pm.expect(text).to.include("validation error");
+        pm.expect(text).to.include("track_ids");
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 3000

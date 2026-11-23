@@ -1,0 +1,39 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** search, then store the first hit's id in the collection variable `chained_track_id` for **Chain 2**. Run both in one run, in order.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "search_music",
+      "arguments": {
+        "query": "Und dann kommt ein Mensch",
+        "qtype": "track",
+        "limit": 3
+      }
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("first hit has an id, which is kept for the next request", function () {
+        pm.expect(sc.items).to.be.an("array").that.is.not.empty;
+        pm.collectionVariables.set("chained_track_id", sc.items[0].id);
+        pm.expect(pm.collectionVariables.get("chained_track_id")).to.be.a("string");
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 6000

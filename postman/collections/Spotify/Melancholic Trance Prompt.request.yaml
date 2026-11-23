@@ -29,6 +29,29 @@ message: |-
       }
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const text = res.messages && res.messages[0] && res.messages[0].content ? String(res.messages[0].content.text) : "";
+      pm.test("prompt has a description and at least one message", function () {
+        pm.expect(res.description).to.be.a("string").and.not.empty;
+        pm.expect(res.messages).to.be.an("array").that.is.not.empty;
+      });
+      pm.test("first message is a text message with a role", function () {
+        pm.expect(res.messages[0].role).to.be.a("string");
+        pm.expect(res.messages[0].content.type).to.equal("text");
+        pm.expect(text.length).to.be.above(0);
+      });
+      pm.test("arguments are rendered into the prompt", function () {
+        ["melancholic", "trance", "90s"].forEach(function (v) { pm.expect(text, String(v)).to.include(String(v)); });
+      });
+      const info = res._meta && res._meta["io.modelcontextprotocol/serverInfo"];
+      pm.test("result carries serverInfo with a semver version", function () {
+        pm.expect(info, "serverInfo").to.be.an("object");
+        pm.expect(info.name).to.be.a("string");
+        pm.expect(info.version).to.match(/^\d+\.\d+\.\d+/);
+      });
 settings:
   version: auto
   requestTimeout: 0

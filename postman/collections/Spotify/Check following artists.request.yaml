@@ -3,14 +3,11 @@ description: |-
   **Purpose:** ask whether the user follows specific artists. Takes up to 50 ids and
   answers in one request.
 
-  **Result: fails.** `Playback is restricted for this content [playback_restricted]`,
-  for a single id as well as a list — the follow-check route is withheld from this
-  app, so the tool is unusable here. Its siblings `check_saved_tracks` and
-  `check_saved_albums` both work.
-
-  Kept in the collection to document the tool's existence and its current failure. If
-  it starts answering, expect `results` (a map of artist id to boolean) plus
-  `checked`, matching the other two.
+  **Result:** answers on server 0.9.2 (verified 2026-11-23). `results` is a map of artist id
+  to boolean, plus `checked`, matching `check_saved_tracks` and `check_saved_albums`. Earlier
+  servers failed with `Playback is restricted for this content [playback_restricted]`, so the
+  failure documented here before is no longer expected; the `afterResponse` tests assert the
+  map shape.
 
   Following is distinct from top-artist standing: an artist can appear in
   `get_top_items` without being followed, and vice versa.
@@ -30,6 +27,21 @@ message: |-
       }
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      const asked = ["7wU1naftD3lNq7rNsiDvOR", "0JQkxELt1FoL470ADWZaOX"];
+      pm.test("results maps every requested id to a boolean", function () {
+        pm.expect(sc.results).to.be.an("object");
+        asked.forEach(function (id) { pm.expect(sc.results[id], id).to.be.a("boolean"); });
+      });
+      pm.test("checked equals the number of ids", function () { pm.expect(sc.checked).to.equal(Object.keys(sc.results).length); });
 settings:
   version: auto
   requestTimeout: 0

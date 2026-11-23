@@ -30,6 +30,20 @@ message: |-
       }
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("one track comes back for one id", function () {
+        pm.expect(sc.tracks).to.be.an("array").with.lengthOf(1);
+        pm.expect(sc.tracks[0].id).to.be.a("string");
+        pm.expect(sc.tracks[0].name).to.be.a("string");
+      });
 settings:
   version: auto
   requestTimeout: 0

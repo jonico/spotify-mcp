@@ -22,6 +22,26 @@ message: |-
       "uri": "spotify://artist/5zbSsk4Qg514fYzb3KhQX7"
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      pm.test("read succeeds with exactly one content entry", function () { pm.expect(res.contents).to.be.an("array").with.lengthOf(1); });
+      pm.test("content echoes the requested uri", function () { pm.expect(res.contents[0].uri).to.equal("spotify://artist/5zbSsk4Qg514fYzb3KhQX7"); });
+      pm.test("content has a mimeType and non-empty text", function () {
+        pm.expect(res.contents[0].mimeType).to.be.a("string");
+        pm.expect(res.contents[0].text).to.be.a("string").and.not.empty;
+      });
+      pm.test("JSON content parses", function () {
+        if (/json/.test(res.contents[0].mimeType)) { pm.expect(JSON.parse(res.contents[0].text)).to.be.an("object"); }
+      });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      const info = res._meta && res._meta["io.modelcontextprotocol/serverInfo"];
+      pm.test("result carries serverInfo with a semver version", function () {
+        pm.expect(info, "serverInfo").to.be.an("object");
+        pm.expect(info.name).to.be.a("string");
+        pm.expect(info.version).to.match(/^\d+\.\d+\.\d+/);
+      });
 settings:
   version: auto
   requestTimeout: 0

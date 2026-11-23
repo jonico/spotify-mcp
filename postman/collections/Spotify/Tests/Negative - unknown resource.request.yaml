@@ -1,0 +1,30 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** a resource URI the server does not serve. **Expected:** protocol error -32602 naming the URI.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "resources/read",
+    "params": {
+      "uri": "spotify://nothing/here"
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const err = pm.response.error;
+      pm.test("unknown resource is a protocol error", function () {
+        pm.expect(pm.response.result, "result").to.equal(undefined);
+        pm.expect(err.kind).to.equal("protocol");
+        pm.expect(err.code).to.equal(-32602);
+        pm.expect(err.message).to.include("spotify://nothing/here");
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 4000

@@ -1,0 +1,42 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** page the saved albums.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "tools/call",
+    "params": {
+      "name": "get_saved_albums",
+      "arguments": {
+        "limit": 5,
+        "offset": 0
+      }
+    }
+  }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("page carries total, limit and offset", function () {
+        pm.expect(sc.items).to.be.an("array");
+        pm.expect(sc.total).to.be.a("number");
+        pm.expect(sc.limit).to.be.a("number");
+        pm.expect(sc.offset).to.be.a("number");
+      });
+      pm.test("every album has id, name, artist and added_at", function () {
+        sc.items.forEach(function (a) { pm.expect(a.id).to.be.a("string"); pm.expect(a.name).to.be.a("string"); pm.expect(a.artist).to.be.a("string"); pm.expect(a.added_at).to.be.a("string"); });
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 10000

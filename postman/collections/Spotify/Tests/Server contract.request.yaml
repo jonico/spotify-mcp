@@ -1,0 +1,77 @@
+$kind: mcp-request
+description: |-
+  **Purpose:** assert the server contract that `tools/list`, `prompts/list` and `resources/list` expose.
+
+  `afterResponse` does not run for list requests, so this request makes a cheap `prompts/get` and
+  asserts in `afterConnect`, whose `pm.response` carries `tools`, `prompts`, `resources`,
+  `resourceTemplates`, `capabilities`, `instructions` and `failures` from the handshake.
+  Never log `pm.request` there: after the connection it holds the resolved credentials.
+transport: stdio
+command: uvx spotify-mcp-jamiew
+env:
+  SPOTIFY_CLIENT_ID: "{{SPOTIFY_CLIENT_ID}}"
+  SPOTIFY_REDIRECT_URI: "{{SPOTIFY_REDIRECT_URI}}"
+  SPOTIFY_CLIENT_SECRET: "{{SPOTIFY_CLIENT_SECRET}}"
+message: |-
+  {
+    "method": "prompts/get",
+    "params": {
+      "name": "discover_similar",
+      "arguments": {
+        "artist": "Major Tom"
+      }
+    }
+  }
+scripts:
+  - type: afterConnect
+    code: |-
+      const r = pm.response;
+      const tools = r.tools, prompts = r.prompts;
+      const names = tools.map(function (t) { return t.name; });
+      const offenders = function (pred) { return tools.filter(pred).map(function (t) { return t.name; }); };
+      const ann = function (t) { return t.annotations || {}; };
+      pm.test("handshake: server reports a name and semver version", function () {
+        pm.expect(r.server.name).to.be.a("string");
+        pm.expect(r.server.version).to.match(/^\d+\.\d+\.\d+/);
+      });
+      pm.test("handshake: negotiates a dated MCP protocol version", function () { pm.expect(r.protocolVersion).to.match(/^\d{4}-\d{2}-\d{2}$/); });
+      pm.test("handshake: advertises tools, prompts and resources", function () {
+        ["tools", "prompts", "resources"].forEach(function (c) { pm.expect(r.capabilities, c).to.have.property(c); });
+      });
+      pm.test("handshake: no capability failed to list", function () { pm.expect(r.failures).to.be.empty; });
+      pm.test("handshake: ships usage instructions", function () { pm.expect(r.instructions).to.be.a("string").and.not.empty; });
+      pm.test("tools: at least 48 with unique snake_case names", function () {
+        pm.expect(tools.length).to.be.at.least(48);
+        pm.expect(new Set(names).size).to.equal(names.length);
+        pm.expect(offenders(function (t) { return !/^[a-z][a-z0-9_]*$/.test(t.name); })).to.deep.equal([]);
+      });
+      pm.test("tools: every tool has a title and a description", function () {
+        pm.expect(offenders(function (t) { return !t.title || !t.description; })).to.deep.equal([]);
+      });
+      pm.test("tools: every tool has an object inputSchema and an outputSchema", function () {
+        pm.expect(offenders(function (t) { return !t.inputSchema || t.inputSchema.type !== "object" || !t.outputSchema; })).to.deep.equal([]);
+      });
+      pm.test("tools: every tool declares readOnlyHint and openWorldHint", function () {
+        pm.expect(offenders(function (t) { return typeof ann(t).readOnlyHint !== "boolean" || typeof ann(t).openWorldHint !== "boolean"; })).to.deep.equal([]);
+      });
+      pm.test("tools: get_/check_/list_/search_ tools are read-only", function () {
+        pm.expect(offenders(function (t) { return /^(get|check|list|search)_/.test(t.name) && ann(t).readOnlyHint !== true; })).to.deep.equal([]);
+      });
+      pm.test("tools: save_/follow_/add_/create_/update_ tools are not read-only", function () {
+        pm.expect(offenders(function (t) { return /^(save|follow|add|create|update)_/.test(t.name) && ann(t).readOnlyHint === true; })).to.deep.equal([]);
+      });
+      pm.test("tools: remove_/unfollow_/reorder_ tools are destructive", function () {
+        pm.expect(offenders(function (t) { return /^(remove|unfollow|reorder)_/.test(t.name) && ann(t).destructiveHint !== true; })).to.deep.equal([]);
+      });
+      pm.test("prompts: five, each with a name and a description", function () {
+        pm.expect(prompts).to.have.lengthOf(5);
+        pm.expect(prompts.filter(function (p) { return !p.name || !p.description; })).to.deep.equal([]);
+      });
+      pm.test("resources: two resources and four templates", function () {
+        pm.expect(r.resources).to.have.lengthOf(2);
+        pm.expect(r.resourceTemplates).to.have.lengthOf(4);
+      });
+settings:
+  version: auto
+  requestTimeout: 60000
+order: 1000

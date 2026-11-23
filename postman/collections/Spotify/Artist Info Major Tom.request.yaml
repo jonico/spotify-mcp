@@ -24,10 +24,24 @@ message: |-
     "params": {
       "name": "get_artist",
       "arguments": {
-        "artist_id": "5gY5PFULD9iPkwMzZrYRAV"
+        "artist_ids": ["5gY5PFULD9iPkwMzZrYRAV"]
       }
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("one artist entry per id", function () { pm.expect(sc.artists).to.be.an("array").with.lengthOf(1); });
+      pm.test("artists is a list of entries with id and name", function () {
+        pm.expect(sc.artists).to.be.an("array");
+        sc.artists.forEach(function (e) { pm.expect(e.id, "id").to.be.a("string"); pm.expect(e.name, "name").to.be.a("string"); });
+      });
 settings:
   version: auto
   requestTimeout: 0

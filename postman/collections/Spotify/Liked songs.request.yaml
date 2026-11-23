@@ -24,6 +24,30 @@ message: |-
       }
     }
   }
+scripts:
+  - type: afterResponse
+    code: |-
+      const res = pm.response.result;
+      const sc = res.structuredContent || {};
+      const errText = res.content && res.content[0] ? String(res.content[0].text).slice(0, 200) : "";
+      pm.test("call succeeds (isError is not true)", function () { pm.expect(res.isError, errText).to.not.equal(true); });
+      pm.test("returns structuredContent", function () { pm.expect(res.structuredContent).to.be.an("object"); });
+      pm.test("answers within 5 s", function () { pm.expect(pm.response.responseTime).to.be.below(5000); });
+      pm.test("every item is a track with id, name and artist", function () {
+        pm.expect(sc.items).to.be.an("array").that.is.not.empty;
+        sc.items.forEach(function (t) {
+          pm.expect(t.id, "id").to.be.a("string");
+          pm.expect(t.name, "name").to.be.a("string");
+          pm.expect(t.artist, "artist").to.be.a("string");
+        });
+      });
+      pm.test("every liked song has added_at", function () { sc.items.forEach(function (t) { pm.expect(t.added_at, t.id).to.be.a("string"); }); });
+      pm.test("page carries total, limit and offset", function () {
+        pm.expect(sc.items).to.be.an("array");
+        pm.expect(sc.total).to.be.a("number");
+        pm.expect(sc.limit).to.be.a("number");
+        pm.expect(sc.offset).to.be.a("number");
+      });
 settings:
   version: auto
   requestTimeout: 0
