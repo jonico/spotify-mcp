@@ -9,6 +9,8 @@ defect, and README drift is how people end up calling tools that don't exist.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import re
 from pathlib import Path
 
@@ -22,10 +24,15 @@ ROOT = Path(__file__).resolve().parents[1]
 # Whole-surface guidance belongs in INSTRUCTIONS instead.
 MAX_DESCRIPTION_CHARS = 1200
 
+# The whole tools/list payload ships to the model every session. It measured
+# 87k JSON chars after dropping per-tool icons (127k with them); this leaves
+# about 10% headroom. Trim elsewhere, or raise it on purpose, when a change needs room.
+MAX_TOOLS_LIST_CHARS = 96_000
+
 
 @pytest.fixture(scope="module")
-async def tools():
-    return await mcp.list_tools()
+def tools():
+    return asyncio.run(mcp.list_tools())
 
 
 @pytest.fixture(scope="module")
@@ -36,31 +43,35 @@ def readme_tools() -> set[str]:
 
 
 class TestToolAnnotations:
-    async def test_every_tool_has_a_title(self, tools):
+    def test_every_tool_has_a_title(self, tools):
         assert [t.name for t in tools if not t.title] == []
 
-    async def test_every_tool_has_behaviour_annotations(self, tools):
+    def test_every_tool_has_behaviour_annotations(self, tools):
         missing = [
             t.name
             for t in tools
-            if t.annotations is None or t.annotations.readOnlyHint is None
+            if t.annotations is None or t.annotations.read_only_hint is None
         ]
         assert missing == []
 
-    async def test_writes_declare_a_destructive_hint(self, tools):
+    def test_writes_declare_a_destructive_hint(self, tools):
         # Only read-only tools may leave destructiveHint unset; for a write, the
         # client has no way to guess.
         missing = [
             t.name
             for t in tools
-            if not t.annotations.readOnlyHint and t.annotations.destructiveHint is None
+            if not t.annotations.read_only_hint
+            and t.annotations.destructive_hint is None
         ]
         assert missing == []
 
-    async def test_every_tool_has_an_icon(self, tools):
-        assert [t.name for t in tools if not t.icons] == []
+    def test_tools_list_stays_within_budget(self, tools):
+        payload = json.dumps(
+            [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in tools]
+        )
+        assert len(payload) <= MAX_TOOLS_LIST_CHARS
 
-    async def test_descriptions_stay_within_budget(self, tools):
+    def test_descriptions_stay_within_budget(self, tools):
         too_long = [
             t.name
             for t in tools
@@ -70,10 +81,10 @@ class TestToolAnnotations:
 
 
 class TestReadmeParity:
-    async def test_readme_documents_every_tool(self, tools, readme_tools):
+    def test_readme_documents_every_tool(self, tools, readme_tools):
         assert sorted({t.name for t in tools} - readme_tools) == []
 
-    async def test_readme_lists_no_tools_that_do_not_exist(self, tools, readme_tools):
+    def test_readme_lists_no_tools_that_do_not_exist(self, tools, readme_tools):
         assert sorted(readme_tools - {t.name for t in tools}) == []
 
 

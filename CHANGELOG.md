@@ -1,5 +1,185 @@
 # Changelog
 
+## 2026-11-07 — 0.9.2
+- `get_playlist_tracks` rejects `limit` below 1 before calling Spotify. A zero or negative
+  limit read nothing but returned the same `next_offset`, so a client following it looped
+  forever.
+- Every `offset` parameter rejects negative values in its schema instead of passing them
+  to Spotify.
+
+## 2026-11-07 — 0.9.1
+- The tool list is about a third smaller (127k to 87k JSON characters). Only the server
+  carries the Spotify icon now, not every tool, resource and prompt. Tool descriptions no
+  longer repeat types, defaults and return shapes that the schemas already give.
+- `get_playlist_tracks` reads at most 1000 tracks per call, so a huge playlist no longer
+  piles up in memory. Omitting `limit` used to read up to about 10,000 tracks; it now
+  stops at 1000. Results add `next_offset` (pass it back as `offset`, null at the end) and
+  `truncated` (true when the cap cut the read short).
+- The server starts and lists its tools without Spotify credentials, so clients and
+  registries can probe it before setup. The first tool call that needs Spotify then fails
+  with an error naming the missing `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET` or
+  `SPOTIFY_REDIRECT_URI`. A source checkout no longer fills them with placeholder values
+  from `pyproject.toml`, which used to end in a confusing OAuth failure.
+
+## 2026-11-07 — 0.9.0
+- Move to MCP Python SDK v2 (`mcp[cli]>=2.3,<3`, Pydantic 2.12+). Clients on the new
+  2026-07-28 protocol now connect, alongside 2025-era and v1-SDK clients.
+- `remove_tracks_from_playlist` asks for confirmation through an SDK resolver, so it works on
+  both protocol eras. On 2026-era connections the old in-tool prompt would have failed every
+  removal. Clients without form elicitation still remove without asking.
+- Tool errors keep their message: v2 hides the text of unexpected exceptions, which would have
+  dropped Spotify's reason. Bad arguments and Spotify errors still reach the model.
+- The server reports its own version in `serverInfo` (v2 reports an empty one by default).
+- Progress messages replace the deprecated `ctx.info()` log notifications while paging
+  playlists.
+- Resources return `application/json`, and a Spotify failure now fails the read with an error
+  (not found for a 404) instead of returning `{"error": ...}` as content.
+  `spotify://user/current` uses the `get_me` shape, which adds `email`.
+  `spotify://playback/current` uses the `get_playback_state` shape: nothing playing reads as
+  `is_playing: false` instead of `{"status": "no_playback"}`.
+- `get_playlist_tracks` no longer stops early when Spotify returns a short page that still
+  has a `next` link.
+- `control_playback`, `remove_tracks_from_playlist` and the Spotify calls in
+  `get_playlist_tracks` run on a worker thread, so they no longer block the event loop.
+- A 404 from a playlist's tracks route is reported as a missing playlist, not a missing track.
+- Logs are quieter: one line with timing per successful tool call, instead of several per
+  call. The SDK logs failures.
+- `control_playback` and `remove_tracks_from_playlist` are plain functions again, so direct
+  Python callers no longer await them. MCP clients are unchanged.
+- The Docker image installs the locked dependency versions from `uv.lock`, using a pinned uv
+  in the build stage only.
+- CI tests Python 3.12, 3.13 and 3.14. The 3.13 job had been running 3.12, because
+  `.python-version` took precedence over `setup-python`.
+
+## 2026-11-01 — 0.8.1
+- `save_audiobooks`, `remove_saved_audiobooks` and `check_saved_audiobooks` failed every
+  time: `/me/library` answers 500/502 for `spotify:audiobook:` URIs. It takes the same id
+  as `spotify:show:`, which is what these tools now send (checked live).
+- Repeated Spotify 5xx errors are reported as an outage again, not as rate limiting.
+- `search_music` refuses `qtype` values other than track, album, artist and playlist
+  instead of returning podcast or audiobook results as broken tracks.
+
+## 2026-11-01 — 0.8.0
+- Thanks to [@mindrunner](https://github.com/mindrunner) for the album, artist, podcast and
+  audiobook library tools ([#27](https://github.com/jamiew/spotify-mcp/pull/27)), and to
+  [@jonico](https://github.com/jonico) for diagnosing the restricted-app artist follow check
+  ([#24](https://github.com/jamiew/spotify-mcp/pull/24)) that shipped in 0.7.0.
+- **Existing users must reauthorize once** for the new `user-follow-modify` scope: restart
+  the server and complete Spotify consent again.
+- 20 new tools (48 total) for saved albums, followed artists, playlist follows, podcast
+  shows and episodes, and audiobooks. Playback, the queue and playlists now handle podcast
+  episodes.
+- `control_playback` and `add_to_queue` keep podcast episodes: `spotify:episode:` URIs and
+  episode share URLs were coerced into `spotify:track:` URIs and rejected by Spotify. Bare
+  IDs are still treated as tracks; an album, show or playlist passed as an item is refused
+  with a pointer to `context_uri`. Show, album and playlist context URIs pass through as before.
+- `add_tracks_to_playlist` and `remove_tracks_from_playlist` keep episode URIs and episode
+  share URLs too, on both the `/items` and the legacy `/tracks` routes. Bare IDs are still
+  tracks.
+- `get_playback_state`, the `spotify://playback/current` resource and the skip check in
+  `control_playback` now ask for `additional_types=track,episode`. Before, a playing podcast
+  episode came back as playing with no track. Episodes in playback and in `get_queue` are
+  returned with `type: "episode"`, the show name in `artist` and `show`, and `show_id`;
+  `Track` gains the optional `type`, `show` and `show_id` fields. `PlaybackState` gains
+  `currently_playing_type`, which explains a playing state with no item (for example an ad).
+- Request the `user-follow-modify` scope, which the `/me/library` writes and the legacy
+  follow routes need for artist and playlist follows. **Existing users must reauthorize**:
+  restart the server and complete Spotify consent again. No auth cache is deleted
+  automatically.
+- New album and artist library tools: `get_saved_albums` (paginated), `save_albums` and
+  `remove_saved_albums` (20 per call), `get_followed_artists` (cursor-paginated via `after`),
+  `follow_artists` and `unfollow_artists` (50 per call). New `follow_playlist` is the
+  counterpart to `unfollow_playlist`. Writes prefer `/me/library` and fall back to the
+  entity routes on legacy apps, in upstream chunks of 40; a failed chunk propagates.
+- New podcast tools: `get_saved_shows`, `save_shows`, `remove_saved_shows` and
+  `check_saved_shows` (50 per call), `get_show_episodes` (paginated, with the user's resume
+  point), `get_saved_episodes`, `save_episodes` and `remove_saved_episodes` (50 per call).
+  `publisher` is optional because restricted apps lose it.
+- New audiobook tools: `get_saved_audiobooks` (paginated), `save_audiobooks` and
+  `remove_saved_audiobooks` (50 per call). The February 2026 reference still lists
+  `GET /me/audiobooks`, and audiobook URIs on `PUT`/`DELETE /me/library`; legacy apps fall back
+  to `/me/audiobooks`. Audiobooks are only offered in some Spotify markets.
+- New `check_saved_episodes` and `check_saved_audiobooks` (50 per call), on
+  `/me/library/contains` with the `/me/episodes/contains` and `/me/audiobooks/contains`
+  fallbacks.
+- `get_playlist_tracks` asks for `additional_types=track,episode` on both the `/items` and
+  legacy `/tracks` routes, so podcast episodes in a playlist come back as episodes. The legacy
+  route no longer goes through spotipy's deprecated `playlist_tracks`.
+- `save_tracks` and `remove_saved_tracks` now reject an empty list, like the other library
+  writes.
+- Checked live: artist, album and episode writes and checks on a restricted app; library
+  and playlist reads on the maintainer's app. Not yet live-checked: `follow_playlist`, show
+  and audiobook writes, and playing, queueing or adding an episode.
+- The publish workflow fails a release whose tag does not match the package version, and
+  a manual rerun skips an already uploaded PyPI version so it can retry the MCP Registry
+  step. Before, a manual run wrote the branch ref into `server.json` as the version.
+- The Docker image no longer installs uv or syncs a dev environment it never used, and CI
+  now checks that the server module imports inside the image.
+- Dependency patch updates, including pydantic 2.14.2 and starlette 1.10.0.
+
+## 2026-09-20 — 0.7.0
+- Request `user-follow-read` and prefer artist URIs on `/me/library/contains`, with the
+  legacy `/me/following/contains` fallback. Existing users must reauthorize for the scope;
+  no auth cache is deleted automatically.
+- Preserve 50-item track writes and track/artist checks by chunking upstream requests at
+  40; album checks remain capped at 20. Preserve membership order, reject incomplete chunks,
+  and propagate later-chunk errors rather than reporting partial writes as success.
+- **Intentional behavior change:** `create_playlist` is private by default. Explicit
+  `public=true` still creates public playlists; existing playlists are unchanged.
+- Declare Pydantic directly; retain `mcp[cli]<2`.
+- Document Cloudflare as the canonical local/hosted development direction while keeping
+  Python supported. Resources, prompts, playback confirmation and tool contracts still differ.
+- Simplify setup documentation and add a README banner made with Glif.
+- Correct Spotify access guidance using the [March 9 postponement](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security),
+  [March external-ID reversal](https://developer.spotify.com/documentation/web-api/references/changes/march-2026),
+  and [July 25-app/shared-developer quota update](https://developer.spotify.com/blog/2026-07-23-web-api-quota-updates).
+  Preserve `QUOTA_EXCEEDED` without an unsupported daily-reset promise. Explain the
+  [five-user/organization extended-access constraints](https://developer.spotify.com/documentation/web-api/concepts/quota-modes),
+  official SDK legacy-route caveat, and [AI ingestion policy](https://developer.spotify.com/policy)
+  beyond training.
+
+## 2026-09-17 — 0.6.1
+- batch every read Spotify allows: `get_tracks` and `get_artist` take up to 50 ids in one
+  request, `get_album` up to 20. `get_artist` returns top tracks, and `get_album` its track
+  list, only for a single-id request — both are per item. A withheld batch route now degrades
+  per kind instead of disabling batching everywhere
+- new `check_saved_tracks` (50), `check_saved_albums` (20) and `check_following_artists` (50):
+  ask what the library already holds in one request instead of paging `get_saved_tracks`.
+  Results are keyed by Spotify id, so a truncated answer errors rather than mis-pairing ids
+- fix library writes: `/me/library` takes its URIs as a query parameter, so the JSON body we
+  sent was rejected with 400 and `save_tracks`/`remove_saved_tracks` only worked via a
+  fallback that pointed at the same route. The legacy branch is now the real `/me/tracks`
+- `unfollow_playlist` goes through the regime fallback instead of the legacy-only route
+- fix `add_to_queue` corrupting `spotify:track:` URIs and share URLs by prefixing them twice
+- stop reporting Spotify outages as quota exhaustion: spotipy raises 429 "Max Retries" when
+  it exhausts 5xx retries, which is now classified as unavailable. 410 is reported as a
+  withdrawn capability, and an insufficient-scope 403 is keyed off Spotify's `reason`
+
+## 2026-09-17 — 0.6.0
+- rename seven tools to match the sibling Cloudflare server, so one set of names covers both:
+  `get_track_info` → `get_tracks`, `get_artist_info` → `get_artist`,
+  `get_album_info` → `get_album`, `get_playlist_info` → `get_playlist`,
+  `get_user_playlists` → `list_playlists`,
+  `modify_playlist_details` → `update_playlist_details`,
+  `reorder_playlist_tracks` → `reorder_playlist`. No aliases: the old names are gone
+
+## 2026-09-17 — 0.5.0
+- retain artist metadata when Spotify withholds top tracks, without hiding authentication errors (#19)
+- retry search at the restricted 10-result cap only for an actual invalid-limit error;
+  cache successful fallbacks and paginate using the returned page size (#20)
+- recover missing playlist totals when contents are readable, retaining metadata when they are forbidden (#21)
+- fall back to individual track reads on a batch 403, caching only after success;
+  authentication and rate-limit errors still propagate (#22)
+- make playback confirmation bounded and nonblocking, allow skips from local tracks,
+  and retain the last observation when a later confirmation read fails.
+  Direct Python callers now await `control_playback`; MCP clients are unchanged (#23)
+- read playlist entries from the `item` key, count `limit`/`offset` in playlist positions,
+  and return local files and unresolved rows instead of dropping them or raising:
+  `Track.id` is optional, `Track.is_local` marks local files, and unresolved rows keep
+  their slot so positions stay usable for reorder and remove
+  (thanks [@tedeuxx](https://github.com/tedeuxx), #16, #18)
+- add a real stdio integration test for CLI startup and session recovery after a tool error
+
 ## 2026-07-30 — 0.4.1
 - cap the runtime dependencies below their next major. `mcp` 2.0 removed
   `mcp.server.fastmcp`, which this server is built on, so the open `>=1.27.1`
@@ -25,9 +205,9 @@ is renamed `search_music` since it always searched more than tracks.
   `get_top_items`
 - `control_playback` gains seek, volume, shuffle, repeat, `context_uri` and
   `device_id` — none of which were reachable before
-- `get_top_items` + `get_recently_played` are the measured replacement for the
-  withdrawn `/recommendations` endpoint, with a `discover_similar` prompt as the
-  stopgap and a `taste_profile` prompt alongside it
+- `get_top_items` + `get_recently_played` support discovery when `/recommendations` is
+  unavailable to the app, with a `discover_similar` prompt and a `taste_profile` prompt.
+  Access restrictions are app-dependent, not a universal endpoint withdrawal.
 - Feb 2026 regime fallback: playlist and library writes try the restricted
   endpoint shape and fall back to the legacy one per family, so the server keeps
   working whichever regime Spotify serves the app

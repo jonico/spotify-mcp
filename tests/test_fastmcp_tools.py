@@ -8,49 +8,92 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from mcp.server.mcpserver import (
+    AcceptedElicitation,
+    Elicit,
+)
+from mcp.server.mcpserver.exceptions import ResourceError, ResourceNotFoundError
+from mcp.types import (
+    ClientCapabilities,
+    ElicitationCapability,
+    FormElicitationCapability,
+    UrlElicitationCapability,
+)
 from spotipy import SpotifyException
 
 from spotify_mcp.fastmcp_server import (
+    MAX_PLAYLIST_TRACKS_PER_CALL,
     PlaybackState,
     Playlist,
+    RemovalConfirmation,
     Track,
     add_to_queue,
     add_tracks_to_playlist,
-    album_resource,
     analyze_large_playlist,
-    artist_resource,
+    check_following_artists,
+    check_saved_albums,
+    check_saved_audiobooks,
+    check_saved_episodes,
+    check_saved_shows,
+    check_saved_tracks,
+    confirm_removal,
     control_playback,
     create_mood_playlist,
     create_playlist,
-    current_playback_resource,
-    current_user,
     discover_music_systematically,
-    get_album_info,
-    get_artist_info,
+    follow_artists,
+    follow_playlist,
+    get_album,
+    get_artist,
+    get_followed_artists,
     get_me,
     get_playback_state,
-    get_playlist_info,
+    get_playlist,
     get_playlist_tracks,
     get_queue,
     get_recently_played,
+    get_saved_albums,
+    get_saved_audiobooks,
+    get_saved_episodes,
+    get_saved_shows,
     get_saved_tracks,
+    get_show_episodes,
     get_top_items,
-    get_track_info,
-    get_user_playlists,
+    get_tracks,
     list_devices,
-    modify_playlist_details,
-    playlist_resource,
+    list_playlists,
+    mcp,
+    remove_saved_albums,
+    remove_saved_audiobooks,
+    remove_saved_episodes,
+    remove_saved_shows,
     remove_saved_tracks,
     remove_tracks_from_playlist,
-    reorder_playlist_tracks,
+    reorder_playlist,
+    save_albums,
+    save_audiobooks,
+    save_episodes,
+    save_shows,
     save_tracks,
     search_music,
-    track_resource,
+    unfollow_artists,
     unfollow_playlist,
+    update_playlist_details,
 )
 
 # A SpotifyException the tools should translate into a ValueError.
 SPOTIFY_ERROR = SpotifyException(404, -1, "track not found")
+
+
+PLAYING_EPISODE = {
+    "type": "episode",
+    "id": "ep1",
+    "name": "Episode 1",
+    "release_date": "2026-01-01",
+    "duration_ms": 3600000,
+    "show": {"id": "sh1", "name": "Some Podcast"},
+    "external_urls": {"spotify": "https://open.spotify.com/episode/ep1"},
+}
 
 
 class TestGetPlaybackState:
@@ -67,6 +110,48 @@ class TestGetPlaybackState:
         assert result.volume == 70
         mock_spotify_api.current_playback.assert_called_once()
 
+    def test_a_playing_episode_shows_its_show(self, mock_spotify_api):
+        mock_spotify_api.current_playback.return_value = {
+            "is_playing": True,
+            "currently_playing_type": "episode",
+            "item": PLAYING_EPISODE,
+            "device": {"name": "Kitchen"},
+            "progress_ms": 1000,
+        }
+
+        result = get_playback_state()
+
+        # Without additional_types the player reports an episode as item=null.
+        mock_spotify_api.current_playback.assert_called_once_with(
+            additional_types="track,episode"
+        )
+
+        assert result.currently_playing_type == "episode"
+        assert result.track is not None
+        assert result.track.type == "episode"
+        assert result.track.id == "ep1"
+        assert result.track.name == "Episode 1"
+        assert result.track.artist == "Some Podcast"
+        assert result.track.show == "Some Podcast"
+        assert result.track.show_id == "sh1"
+        assert result.track.album is None
+        assert result.track.release_date == "2026-01-01"
+
+    def test_an_item_spotify_withheld_is_explained_by_the_type(self, mock_spotify_api):
+        # What the player sends for an episode when additional_types is missing,
+        # and still sends for ads: playing, with no item.
+        mock_spotify_api.current_playback.return_value = {
+            "is_playing": True,
+            "currently_playing_type": "ad",
+            "item": None,
+        }
+
+        result = get_playback_state()
+
+        assert result.is_playing is True
+        assert result.track is None
+        assert result.currently_playing_type == "ad"
+
     def test_no_active_playback(self, mock_spotify_api):
         mock_spotify_api.current_playback.return_value = None
 
@@ -76,6 +161,20 @@ class TestGetPlaybackState:
         assert result.is_playing is False
         assert result.track is None
 
+    def test_local_file_playback(self, mock_spotify_api, sample_playback_data):
+        # parse_track is shared with playlist reads: a local file must not raise here
+        local = {**sample_playback_data["item"], "id": None, "is_local": True}
+        mock_spotify_api.current_playback.return_value = {
+            **sample_playback_data,
+            "item": local,
+        }
+
+        result = get_playback_state()
+
+        assert result.track is not None
+        assert result.track.id is None
+        assert result.track.is_local is True
+
     def test_spotify_error_becomes_value_error(self, mock_spotify_api):
         mock_spotify_api.current_playback.side_effect = SPOTIFY_ERROR
 
@@ -84,15 +183,6 @@ class TestGetPlaybackState:
 
 
 class TestControlPlayback:
-    def test_play_tracks(self, mock_spotify_api, sample_playback_data):
-        mock_spotify_api.current_playback.return_value = sample_playback_data
-
-        control_playback("play", track_ids=["4iV5W9uYEdYUVa79Axb7Rh"])
-
-        mock_spotify_api.start_playback.assert_called_once_with(
-            device_id=None, uris=["spotify:track:4iV5W9uYEdYUVa79Axb7Rh"]
-        )
-
     def test_play_context_wins_over_tracks(
         self, mock_spotify_api, sample_playback_data
     ):
@@ -104,42 +194,42 @@ class TestControlPlayback:
             device_id=None, context_uri="spotify:album:x"
         )
 
-    def test_resume(self, mock_spotify_api, sample_playback_data):
+    def test_play_keeps_episode_uris(self, mock_spotify_api, sample_playback_data):
         mock_spotify_api.current_playback.return_value = sample_playback_data
 
-        control_playback("play")
+        control_playback(
+            "play",
+            track_ids=[
+                "spotify:episode:ep1",
+                "https://open.spotify.com/episode/ep2?si=x",
+                "abc",
+            ],
+        )
 
-        mock_spotify_api.start_playback.assert_called_once_with(device_id=None)
+        mock_spotify_api.start_playback.assert_called_once_with(
+            device_id=None,
+            uris=["spotify:episode:ep1", "spotify:episode:ep2", "spotify:track:abc"],
+        )
 
-    def test_pause(self, mock_spotify_api, sample_playback_data):
+    @pytest.mark.parametrize(
+        "context",
+        ["spotify:show:sh1", "spotify:album:al1", "spotify:playlist:pl1"],
+    )
+    def test_play_passes_context_uris_through(
+        self, mock_spotify_api, sample_playback_data, context
+    ):
         mock_spotify_api.current_playback.return_value = sample_playback_data
 
-        control_playback("pause")
+        control_playback("play", context_uri=context)
 
-        mock_spotify_api.pause_playback.assert_called_once_with(device_id=None)
+        mock_spotify_api.start_playback.assert_called_once_with(
+            device_id=None, context_uri=context
+        )
 
-    def test_seek(self, mock_spotify_api, sample_playback_data):
-        mock_spotify_api.current_playback.return_value = sample_playback_data
-
-        control_playback("seek", position_ms=42000)
-
-        mock_spotify_api.seek_track.assert_called_once_with(42000, device_id=None)
-
-    def test_volume_targets_a_device(self, mock_spotify_api, sample_playback_data):
-        mock_spotify_api.current_playback.return_value = sample_playback_data
-
-        control_playback("volume", volume_percent=30, device_id="dev1")
-
-        mock_spotify_api.volume.assert_called_once_with(30, device_id="dev1")
-
-    def test_shuffle_and_repeat(self, mock_spotify_api, sample_playback_data):
-        mock_spotify_api.current_playback.return_value = sample_playback_data
-
-        control_playback("shuffle", state="on")
-        control_playback("repeat", state="context")
-
-        mock_spotify_api.shuffle.assert_called_once_with(True, device_id=None)
-        mock_spotify_api.repeat.assert_called_once_with("context", device_id=None)
+    def test_play_rejects_a_context_passed_as_an_item(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="album"):
+            control_playback("play", track_ids=["spotify:album:al1"])
+        mock_spotify_api.start_playback.assert_not_called()
 
     def test_seek_without_position_raises(self, mock_spotify_api):
         with pytest.raises(ValueError, match="position_ms"):
@@ -149,9 +239,175 @@ class TestControlPlayback:
         with pytest.raises(ValueError, match="repeat"):
             control_playback("repeat", state="on")
 
-    def test_invalid_action_raises(self, mock_spotify_api):
-        with pytest.raises(ValueError, match="Invalid action"):
-            control_playback("teleport")
+
+class TestControlPlaybackReadBack:
+    """Spotify applies player changes asynchronously, so the state is read back until
+    it reflects the action. These drive the stale-then-fresh sequence a single
+    immediate read would have returned wrongly."""
+
+    TRACK = {
+        "name": "Never Gonna Give You Up",
+        "artists": [{"name": "Rick Astley", "id": "0gxyHStUsqpMadRV0Di1Qt"}],
+        "album": {"name": "Whenever You Need Somebody", "id": "6XzKGcM6laRkTrME3rQvJw"},
+        "duration_ms": 213573,
+    }
+
+    def _playing(self, track_id="4iV5W9uYEdYUVa79Axb7Rh", **over):
+        state = {
+            "is_playing": True,
+            "item": {**self.TRACK, "id": track_id},
+            "device": {"name": "My iPhone", "volume_percent": 70},
+            "shuffle_state": False,
+            "repeat_state": "off",
+            "progress_ms": 1000,
+        }
+        state.update(over)
+        return state
+
+    def test_play_waits_out_an_idle_device(self, mock_spotify_api):
+        """A waking device answers None, which reads back as an empty, not-playing
+        state. The old code returned that."""
+        mock_spotify_api.current_playback.side_effect = [
+            None,
+            None,
+            self._playing(),
+        ]
+
+        result = control_playback("play")
+
+        assert result.is_playing is True
+        assert result.track is not None
+        assert result.track.id == "4iV5W9uYEdYUVa79Axb7Rh"
+
+    def test_play_waits_past_the_pre_action_state(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(is_playing=False),
+            self._playing(),
+        ]
+
+        assert control_playback("play").is_playing is True
+
+    def test_pause_waits_for_playback_to_stop(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(),
+            self._playing(is_playing=False),
+        ]
+
+        assert control_playback("pause").is_playing is False
+
+    def test_next_waits_for_the_track_to_change(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(track_id="old"),  # pre-action read
+            self._playing(track_id="old"),  # still stale
+            self._playing(track_id="new"),
+        ]
+
+        result = control_playback("next")
+
+        assert result.track is not None
+        assert result.track.id == "new"
+
+    def test_next_can_leave_a_local_track(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(
+                item={
+                    **self.TRACK,
+                    "id": None,
+                    "is_local": True,
+                    "uri": "spotify:local:artist:album:track:213",
+                }
+            ),
+            self._playing(track_id="catalog"),
+        ]
+
+        result = control_playback("next")
+
+        mock_spotify_api.next_track.assert_called_once()
+        assert result.track is not None
+        assert result.track.id == "catalog"
+
+    def test_polling_rate_limit_preserves_last_observation(
+        self, mock_spotify_api, caplog
+    ):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(is_playing=False, progress_ms=1234),
+            SpotifyException(429, -1, "rate limited", headers={"Retry-After": "60"}),
+            self._playing(),
+        ]
+
+        result = control_playback("play")
+
+        assert result.is_playing is False
+        assert result.progress_ms == 1234
+        mock_spotify_api.start_playback.assert_called_once()
+        assert mock_spotify_api.current_playback.call_count == 2
+        assert any(
+            record.levelname == "WARNING" and "429" in record.getMessage()
+            for record in caplog.records
+        )
+
+    def test_write_failure_still_raises(self, mock_spotify_api):
+        mock_spotify_api.start_playback.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError) as exc:
+            control_playback("play")
+
+        assert exc.value.__cause__ is SPOTIFY_ERROR
+        mock_spotify_api.start_playback.assert_called_once()
+        mock_spotify_api.current_playback.assert_not_called()
+
+    def test_next_can_leave_an_episode(self, mock_spotify_api):
+        episode = {"is_playing": True, "item": PLAYING_EPISODE}
+        mock_spotify_api.current_playback.side_effect = [
+            episode,
+            episode,
+            self._playing(track_id="t2"),
+        ]
+
+        result = control_playback("next")
+
+        assert result.track is not None
+        assert result.track.id == "t2"
+        assert mock_spotify_api.current_playback.call_args_list[0].kwargs == {
+            "additional_types": "track,episode"
+        }
+
+    def test_shuffle_waits_for_the_flag(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(shuffle_state=False),
+            self._playing(shuffle_state=True),
+        ]
+
+        assert control_playback("shuffle", state="on").shuffle is True
+
+    def test_volume_waits_for_the_level(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(device={"name": "My iPhone", "volume_percent": 70}),
+            self._playing(device={"name": "My iPhone", "volume_percent": 30}),
+        ]
+
+        assert control_playback("volume", volume_percent=30).volume == 30
+
+    def test_seek_rejects_a_stale_position(self, mock_spotify_api):
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(progress_ms=1000),
+            self._playing(progress_ms=42120),
+        ]
+
+        assert control_playback("seek", position_ms=42000).progress_ms == 42120
+
+    def test_gives_up_rather_than_hanging(self, mock_spotify_api):
+        """A device that never reports the change must not block or raise — the last
+        state read is returned, matching the old behaviour."""
+        mock_spotify_api.current_playback.side_effect = [
+            self._playing(is_playing=False, progress_ms=position)
+            for position in range(5)
+        ]
+
+        result = control_playback("play")
+
+        assert result.is_playing is False
+        assert result.progress_ms == 4
 
 
 class TestListDevices:
@@ -175,6 +431,14 @@ class TestListDevices:
 
 
 class TestSearchTracks:
+    @pytest.mark.parametrize("qtype", ["audiobook", "show", "episode"])
+    def test_unsupported_types_are_refused_before_any_request(
+        self, mock_spotify_api, qtype
+    ):
+        with pytest.raises(ValueError, match="qtype"):
+            search_music("Project Hail Mary", qtype=qtype)
+        mock_spotify_api.search.assert_not_called()
+
     def test_basic_track_search(self, mock_spotify_api, sample_search_results):
         mock_spotify_api.search.return_value = sample_search_results
 
@@ -284,6 +548,36 @@ class TestQueue:
             "spotify:track:4iV5W9uYEdYUVa79Axb7Rh"
         )
 
+    @pytest.mark.parametrize(
+        "given",
+        [
+            "spotify:track:4iV5W9uYEdYUVa79Axb7Rh",
+            "https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh",
+        ],
+    )
+    def test_add_to_queue_accepts_uris_and_urls(self, mock_spotify_api, given):
+        # A URI used to be pasted into "spotify:track:" a second time and rejected
+        add_to_queue(given)
+
+        mock_spotify_api.add_to_queue.assert_called_once_with(
+            "spotify:track:4iV5W9uYEdYUVa79Axb7Rh"
+        )
+
+    @pytest.mark.parametrize(
+        "given",
+        [
+            "spotify:episode:ep1",
+            "https://open.spotify.com/episode/ep1",
+            "https://open.spotify.com/intl-de/episode/ep1?si=abc",
+        ],
+    )
+    def test_add_to_queue_keeps_episodes(self, mock_spotify_api, given):
+        # Episodes used to be coerced into spotify:track: and rejected upstream
+        result = add_to_queue(given)
+
+        assert result.message == "Added episode to queue"
+        mock_spotify_api.add_to_queue.assert_called_once_with("spotify:episode:ep1")
+
     def test_add_to_queue_error(self, mock_spotify_api):
         mock_spotify_api.add_to_queue.side_effect = SPOTIFY_ERROR
 
@@ -302,6 +596,19 @@ class TestQueue:
         assert result.currently_playing.name == "Never Gonna Give You Up"
         assert len(result.queue) == 2
 
+    def test_get_queue_with_episodes(self, mock_spotify_api, sample_track_data):
+        mock_spotify_api.queue.return_value = {
+            "currently_playing": PLAYING_EPISODE,
+            "queue": [sample_track_data, PLAYING_EPISODE],
+        }
+
+        result = get_queue()
+
+        assert result.currently_playing is not None
+        assert result.currently_playing.show == "Some Podcast"
+        assert [t.type for t in result.queue] == [None, "episode"]
+        assert result.queue[1].artist == "Some Podcast"
+
     def test_get_queue_empty(self, mock_spotify_api):
         mock_spotify_api.queue.return_value = {"currently_playing": None, "queue": []}
 
@@ -317,11 +624,11 @@ class TestQueue:
             get_queue()
 
 
-class TestGetTrackInfo:
+class TestGetTracks:
     def test_single_track(self, mock_spotify_api, sample_track_data):
         mock_spotify_api.track.return_value = sample_track_data
 
-        result = get_track_info("4iV5W9uYEdYUVa79Axb7Rh")
+        result = get_tracks("4iV5W9uYEdYUVa79Axb7Rh")
 
         assert len(result.tracks) == 1
         assert result.tracks[0].artist == "Rick Astley"
@@ -332,34 +639,34 @@ class TestGetTrackInfo:
             "tracks": [sample_track_data, sample_track_data]
         }
 
-        result = get_track_info(["id1", "id2"])
+        result = get_tracks(["id1", "id2"])
 
         assert len(result.tracks) == 2
         mock_spotify_api.tracks.assert_called_once_with(["id1", "id2"])
 
     def test_too_many_ids_raises(self, mock_spotify_api):
         with pytest.raises(ValueError, match="Maximum 50"):
-            get_track_info([f"id{i}" for i in range(51)])
+            get_tracks([f"id{i}" for i in range(51)])
 
     def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api.track.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            get_track_info("badid")
+            get_tracks("badid")
 
 
-class TestGetArtistInfo:
+class TestGetArtist:
     def test_success(self, mock_spotify_api, sample_artist_data, sample_track_data):
         mock_spotify_api.artist.return_value = sample_artist_data
         mock_spotify_api.artist_top_tracks.return_value = {
             "tracks": [sample_track_data]
         }
 
-        result = get_artist_info("0gxyHStUsqpMadRV0Di1Qt")
+        result = get_artist("0gxyHStUsqpMadRV0Di1Qt")
 
-        assert result.artist.name == "Rick Astley"
-        assert result.artist.followers == 1234567
-        assert result.artist.genres == ["dance pop", "new wave pop"]
+        assert [a.name for a in result.artists] == ["Rick Astley"]
+        assert result.artists[0].followers == 1234567
+        assert result.artists[0].genres == ["dance pop", "new wave pop"]
         assert len(result.top_tracks) == 1
         assert result.top_tracks[0].name == "Never Gonna Give You Up"
 
@@ -367,14 +674,67 @@ class TestGetArtistInfo:
         mock_spotify_api.artist.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            get_artist_info("badid")
+            get_artist("badid")
+
+    def test_withheld_top_tracks_still_returns_artist(
+        self, mock_spotify_api, sample_artist_data
+    ):
+        """Restricted apps get 403 from /top-tracks; the artist must still come back."""
+        mock_spotify_api.artist.return_value = sample_artist_data
+        mock_spotify_api.artist_top_tracks.side_effect = SpotifyException(
+            403, -1, "Forbidden"
+        )
+
+        result = get_artist("0gxyHStUsqpMadRV0Di1Qt")
+
+        assert [a.name for a in result.artists] == ["Rick Astley"]
+        assert result.top_tracks == []
+
+    @pytest.mark.parametrize("status", [401, 429, 500])
+    def test_other_top_tracks_errors_still_raise(
+        self, mock_spotify_api, sample_artist_data, status
+    ):
+        """Authentication, quota, and server errors are not withheld endpoints."""
+        mock_spotify_api.artist.return_value = sample_artist_data
+        error = SpotifyException(status, -1, "Request failed", reason="TEST_REASON")
+        mock_spotify_api.artist_top_tracks.side_effect = error
+
+        with pytest.raises(ValueError) as raised:
+            get_artist("0gxyHStUsqpMadRV0Di1Qt")
+        assert raised.value.__cause__ is error
+
+    def test_batches_several_artists_into_one_request(
+        self, mock_spotify_api, sample_artist_data
+    ):
+        second = {**sample_artist_data, "id": "a2", "name": "Second"}
+        mock_spotify_api.artists.return_value = {
+            "artists": [sample_artist_data, second]
+        }
+
+        result = get_artist(["0gxyHStUsqpMadRV0Di1Qt", "a2"])
+
+        assert [a.name for a in result.artists] == ["Rick Astley", "Second"]
+        mock_spotify_api.artists.assert_called_once_with(
+            ["0gxyHStUsqpMadRV0Di1Qt", "a2"]
+        )
+        # top tracks are per artist, so a batch request must not fetch them
+        mock_spotify_api.artist_top_tracks.assert_not_called()
+        assert result.top_tracks == []
+
+    def test_rejects_more_than_fifty_artists(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="Maximum 50"):
+            get_artist([f"a{i}" for i in range(51)])
+
+    def test_rejects_an_empty_list(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="At least one"):
+            get_artist([])
 
 
-class TestGetPlaylistInfo:
+class TestGetPlaylist:
     def test_success(self, mock_spotify_api, sample_playlist_data):
         mock_spotify_api.playlist.return_value = sample_playlist_data
 
-        result = get_playlist_info("37i9dQZF1DX0XUsuxWHRQd")
+        result = get_playlist("37i9dQZF1DX0XUsuxWHRQd")
 
         assert result.name == "RapCaviar"
         assert result.total_tracks == 50
@@ -382,42 +742,185 @@ class TestGetPlaylistInfo:
             "37i9dQZF1DX0XUsuxWHRQd",
             fields="id,name,description,owner,public,tracks.total",
         )
+        # a reported count is trusted, so no extra lookup is made
+        mock_spotify_api._get.assert_not_called()
+
+    def test_falls_back_to_the_items_endpoint_for_a_stripped_count(
+        self, mock_spotify_api, sample_playlist_data
+    ):
+        """Restricted apps get `tracks.total` stripped; total_tracks must still fill."""
+        mock_spotify_api.playlist.return_value = {**sample_playlist_data, "tracks": {}}
+        mock_spotify_api._get.return_value = {"items": [], "total": 65}
+
+        result = get_playlist("37i9dQZF1DX0XUsuxWHRQd")
+
+        assert result.total_tracks == 65
+
+    def test_forbidden_contents_preserve_readable_metadata(
+        self, mock_spotify_api, sample_playlist_data
+    ):
+        mock_spotify_api.playlist.return_value = {**sample_playlist_data, "tracks": {}}
+        mock_spotify_api._get.side_effect = SpotifyException(403, -1, "Forbidden")
+
+        result = get_playlist("37i9dQZF1DX0XUsuxWHRQd")
+
+        assert result.id == sample_playlist_data["id"]
+        assert result.name == sample_playlist_data["name"]
+        assert result.total_tracks is None
+
+    @pytest.mark.parametrize("status", [401, 429, 500])
+    def test_count_lookup_errors_remain_visible(
+        self, mock_spotify_api, sample_playlist_data, status
+    ):
+        mock_spotify_api.playlist.return_value = {**sample_playlist_data, "tracks": {}}
+        error = SpotifyException(status, -1, "Request failed", reason="TEST_REASON")
+        mock_spotify_api._get.side_effect = error
+
+        with pytest.raises(ValueError) as raised:
+            get_playlist("37i9dQZF1DX0XUsuxWHRQd")
+        assert raised.value.__cause__ is error
 
     def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api.playlist.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            get_playlist_info("badid")
+            get_playlist("badid")
 
 
-class TestGetAlbumInfo:
+class TestGetAlbum:
     def test_success(self, mock_spotify_api, sample_album_data):
         mock_spotify_api.album.return_value = sample_album_data
 
-        result = get_album_info("6XzKGcM6laRkTrME3rQvJw")
+        result = get_album("6XzKGcM6laRkTrME3rQvJw")
 
-        assert result.album.name == "Whenever You Need Somebody"
-        assert result.album.label == "RCA"
-        assert result.album.total_tracks == 10
+        assert [a.name for a in result.albums] == ["Whenever You Need Somebody"]
+        assert result.albums[0].label == "RCA"
+        assert result.albums[0].total_tracks == 10
         assert len(result.tracks) == 1
 
     def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api.album.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            get_album_info("badid")
+            get_album("badid")
+
+    def test_batches_several_albums_into_one_request(
+        self, mock_spotify_api, sample_album_data
+    ):
+        second = {**sample_album_data, "id": "al2", "name": "Second"}
+        mock_spotify_api.albums.return_value = {"albums": [sample_album_data, second]}
+
+        result = get_album(["6XzKGcM6laRkTrME3rQvJw", "al2"])
+
+        assert [a.name for a in result.albums] == [
+            "Whenever You Need Somebody",
+            "Second",
+        ]
+        mock_spotify_api.albums.assert_called_once_with(
+            ["6XzKGcM6laRkTrME3rQvJw", "al2"]
+        )
+        # the track list belongs to one album, so a batch request omits it
+        assert result.tracks == []
+
+    def test_rejects_more_than_twenty_albums(self, mock_spotify_api):
+        # Spotify's album batch cap is 20, lower than the 50 for tracks/artists
+        with pytest.raises(ValueError, match="Maximum 20"):
+            get_album([f"al{i}" for i in range(21)])
+
+
+class TestMembershipChecks:
+    def test_saved_tracks_keyed_by_id(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = [True, False]
+
+        result = check_saved_tracks(["abc", "spotify:track:def"])
+
+        assert result.results == {"abc": True, "def": False}
+        assert result.checked == 2
+        mock_spotify_api._get.assert_called_once_with(
+            "me/library/contains", uris="spotify:track:abc,spotify:track:def"
+        )
+
+    def test_saved_albums_cap_is_twenty(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="Maximum 20"):
+            check_saved_albums([f"al{i}" for i in range(21)])
+
+    def test_followed_artists_reads_consolidated_library(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = [True]
+
+        result = check_following_artists(["a1"])
+
+        assert result.results == {"a1": True}
+        mock_spotify_api._get.assert_called_once_with(
+            "me/library/contains", uris="spotify:artist:a1"
+        )
+
+    def test_a_short_answer_is_an_error_not_a_mis_zip(self, mock_spotify_api):
+        # Spotify answers positionally; a truncated answer must not silently
+        # associate the wrong id with the wrong flag.
+        mock_spotify_api._get.return_value = [True]
+
+        with pytest.raises(ValueError):
+            check_saved_tracks(["abc", "def"])
+
+    def test_spotify_error_becomes_value_error(self, mock_spotify_api):
+        mock_spotify_api._get.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            check_following_artists(["a1"])
+
+    @pytest.mark.parametrize("operation", [check_saved_tracks, check_following_artists])
+    def test_fifty_items_remain_supported(self, mock_spotify_api, operation):
+        mock_spotify_api._get.side_effect = [[False] * 40, [True] * 10]
+
+        result = operation([f"id{i}" for i in range(50)])
+
+        assert result.results == {f"id{i}": i >= 40 for i in range(50)}
+        assert result.checked == 50
+
+    @pytest.mark.parametrize("operation", [check_saved_tracks, check_following_artists])
+    def test_more_than_fifty_is_rejected_before_requests(
+        self, mock_spotify_api, operation
+    ):
+        with pytest.raises(ValueError):
+            operation([f"id{i}" for i in range(51)])
+        mock_spotify_api._get.assert_not_called()
+
+    @pytest.mark.parametrize("operation", [save_tracks, remove_saved_tracks])
+    def test_failed_second_write_chunk_never_reports_success(
+        self, mock_spotify_api, operation
+    ):
+        error = SpotifyException(429, -1, "Quota exceeded", reason="QUOTA_EXCEEDED")
+        method = (
+            mock_spotify_api._put
+            if operation is save_tracks
+            else mock_spotify_api._delete
+        )
+        method.side_effect = [None, error]
+
+        with pytest.raises(ValueError):
+            operation([f"id{i}" for i in range(50)])
+
+        assert method.call_count == 2
 
 
 class TestCreatePlaylist:
-    def test_success(self, mock_spotify_api, sample_playlist_data):
+    def test_private_unless_explicitly_public(
+        self, mock_spotify_api, sample_playlist_data
+    ):
         mock_spotify_api._post.return_value = sample_playlist_data
 
-        result = create_playlist("My Playlist", description="desc", public=False)
+        result = create_playlist("My Playlist", description="desc")
 
         assert result.name == "RapCaviar"
         mock_spotify_api._post.assert_called_once_with(
             "me/playlists",
             payload={"name": "My Playlist", "public": False, "description": "desc"},
+        )
+
+        create_playlist("Shared Playlist", public=True)
+        mock_spotify_api._post.assert_called_with(
+            "me/playlists",
+            payload={"name": "Shared Playlist", "public": True, "description": ""},
         )
 
     def test_spotify_error(self, mock_spotify_api):
@@ -440,6 +943,46 @@ class TestAddTracksToPlaylist:
             payload={"uris": ["spotify:track:rawid", "spotify:track:already"]},
         )
 
+    def test_keeps_episode_uris_and_urls(self, mock_spotify_api):
+        # Episodes used to be coerced into spotify:track: URIs and rejected
+        mock_spotify_api._post.return_value = {"snapshot_id": "s1"}
+
+        add_tracks_to_playlist(
+            "pl1",
+            ["spotify:episode:ep1", "https://open.spotify.com/episode/ep2?si=x", "t1"],
+        )
+
+        mock_spotify_api._post.assert_called_once_with(
+            "playlists/pl1/items",
+            payload={
+                "uris": [
+                    "spotify:episode:ep1",
+                    "spotify:episode:ep2",
+                    "spotify:track:t1",
+                ]
+            },
+        )
+
+    def test_legacy_apps_get_episode_uris_on_the_tracks_route(self, mock_spotify_api):
+        mock_spotify_api._post.side_effect = [
+            SpotifyException(404, -1, "not served"),
+            {"snapshot_id": "s1"},
+        ]
+
+        add_tracks_to_playlist("pl1", ["spotify:episode:ep1"])
+
+        assert mock_spotify_api._post.call_args_list[-1].args == (
+            "playlists/pl1/tracks",
+        )
+        assert mock_spotify_api._post.call_args_list[-1].kwargs == {
+            "payload": {"uris": ["spotify:episode:ep1"]}
+        }
+
+    def test_rejects_a_non_playable_uri_before_any_request(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="album"):
+            add_tracks_to_playlist("pl1", ["spotify:album:al1"])
+        mock_spotify_api._post.assert_not_called()
+
     def test_empty_list(self, mock_spotify_api):
         mock_spotify_api._post.return_value = {"snapshot_id": "s1"}
 
@@ -454,11 +997,43 @@ class TestAddTracksToPlaylist:
             add_tracks_to_playlist("pl1", ["rawid"])
 
 
+CONFIRMED = AcceptedElicitation(data=RemovalConfirmation(confirm=True))
+
+
 class TestRemoveTracksFromPlaylist:
-    async def test_converts_ids_and_uris(self, mock_spotify_api):
+    def test_keeps_episode_uris(self, mock_spotify_api):
         mock_spotify_api._delete.return_value = {"snapshot_id": "s2"}
 
-        result = await remove_tracks_from_playlist("pl1", ["rawid"])
+        remove_tracks_from_playlist(
+            "pl1", ["https://open.spotify.com/episode/ep1", "t1"], CONFIRMED
+        )
+
+        mock_spotify_api._delete.assert_called_once_with(
+            "playlists/pl1/items",
+            payload={
+                "items": [{"uri": "spotify:episode:ep1"}, {"uri": "spotify:track:t1"}]
+            },
+        )
+
+    def test_legacy_apps_get_episode_uris_on_the_tracks_route(self, mock_spotify_api):
+        mock_spotify_api._delete.side_effect = [
+            SpotifyException(404, -1, "not served"),
+            {"snapshot_id": "s2"},
+        ]
+
+        remove_tracks_from_playlist("pl1", ["spotify:episode:ep1"], CONFIRMED)
+
+        assert mock_spotify_api._delete.call_args_list[-1].args == (
+            "playlists/pl1/tracks",
+        )
+        assert mock_spotify_api._delete.call_args_list[-1].kwargs == {
+            "payload": {"tracks": [{"uri": "spotify:episode:ep1"}]}
+        }
+
+    def test_converts_ids_and_uris(self, mock_spotify_api):
+        mock_spotify_api._delete.return_value = {"snapshot_id": "s2"}
+
+        result = remove_tracks_from_playlist("pl1", ["rawid"], CONFIRMED)
 
         assert result.status == "success"
         assert result.snapshot_id == "s2"
@@ -467,75 +1042,58 @@ class TestRemoveTracksFromPlaylist:
             payload={"items": [{"uri": "spotify:track:rawid"}]},
         )
 
-    async def test_spotify_error(self, mock_spotify_api):
+    def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api._delete.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            await remove_tracks_from_playlist("pl1", ["rawid"])
+            remove_tracks_from_playlist("pl1", ["rawid"], CONFIRMED)
 
-    async def test_elicit_accept_proceeds(self, mock_spotify_api, mock_context):
-        mock_spotify_api._delete.return_value = {"snapshot_id": "s2"}
-        mock_spotify_api.playlist_remove_all_occurrences_of_items.return_value = {
-            "snapshot_id": "s2"
-        }
-        mock_context.elicit.return_value = SimpleNamespace(
-            action="accept", data=SimpleNamespace(confirm=True)
+
+def _ctx_with(capabilities: ClientCapabilities | None) -> SimpleNamespace:
+    return SimpleNamespace(client_capabilities=capabilities)
+
+
+class TestConfirmRemoval:
+    @pytest.mark.parametrize(
+        "elicitation",
+        [
+            # A bare `elicitation: {}` predates modes and means form support.
+            ElicitationCapability(),
+            ElicitationCapability(form=FormElicitationCapability()),
+        ],
+        ids=["bare", "form"],
+    )
+    def test_asks_clients_that_can_render_a_form(self, elicitation):
+        question = confirm_removal(
+            "pl1",
+            ["t1", "spotify:episode:ep1"],
+            _ctx_with(ClientCapabilities(elicitation=elicitation)),
         )
 
-        result = await remove_tracks_from_playlist("pl1", ["rawid"], ctx=mock_context)
+        assert isinstance(question, Elicit)
+        assert "Remove 2 track(s) from playlist pl1" in question.message
 
-        assert result.status == "success"
-        mock_context.elicit.assert_awaited_once()
-        mock_spotify_api._delete.assert_called_once()
+    @pytest.mark.parametrize(
+        "capabilities",
+        [
+            None,
+            ClientCapabilities(),
+            # url-only clients can't render the confirmation form.
+            ClientCapabilities(
+                elicitation=ElicitationCapability(url=UrlElicitationCapability())
+            ),
+        ],
+        ids=["none-declared", "no-elicitation", "url-only"],
+    )
+    def test_proceeds_without_asking_when_the_client_cannot(self, capabilities):
+        answer = confirm_removal("pl1", ["t1"], _ctx_with(capabilities))
 
-    async def test_elicit_decline_cancels(self, mock_spotify_api, mock_context):
-        mock_context.elicit.return_value = SimpleNamespace(action="decline", data=None)
-
-        result = await remove_tracks_from_playlist("pl1", ["rawid"], ctx=mock_context)
-
-        assert result.status == "cancelled"
-        mock_spotify_api._delete.assert_not_called()
-
-    async def test_elicit_unsupported_proceeds(self, mock_spotify_api, mock_context):
-        mock_spotify_api._delete.return_value = {"snapshot_id": "s2"}
-        # Client doesn't advertise elicitation: skip the prompt and proceed.
-        mock_context.session.check_client_capability.return_value = False
-        mock_spotify_api.playlist_remove_all_occurrences_of_items.return_value = {
-            "snapshot_id": "s2"
-        }
-
-        result = await remove_tracks_from_playlist("pl1", ["rawid"], ctx=mock_context)
-
-        assert result.status == "success"
-        mock_context.elicit.assert_not_awaited()
-        mock_spotify_api._delete.assert_called_once()
-
-    async def test_elicit_error_does_not_delete(self, mock_spotify_api, mock_context):
-        # Client supports elicitation but the prompt fails: must NOT delete.
-        mock_context.elicit.side_effect = RuntimeError("transport failure")
-
-        with pytest.raises(RuntimeError):
-            await remove_tracks_from_playlist("pl1", ["rawid"], ctx=mock_context)
-
-        mock_spotify_api._delete.assert_not_called()
-
-    async def test_elicit_accept_without_confirm_cancels(
-        self, mock_spotify_api, mock_context
-    ):
-        # accepting the form but leaving confirm unchecked must NOT delete
-        mock_context.elicit.return_value = SimpleNamespace(
-            action="accept", data=SimpleNamespace(confirm=False)
-        )
-
-        result = await remove_tracks_from_playlist("pl1", ["rawid"], ctx=mock_context)
-
-        assert result.status == "cancelled"
-        mock_spotify_api._delete.assert_not_called()
+        assert answer == RemovalConfirmation(confirm=True)
 
 
-class TestModifyPlaylistDetails:
+class TestUpdatePlaylistDetails:
     def test_success(self, mock_spotify_api):
-        result = modify_playlist_details("pl1", name="New Name", public=False)
+        result = update_playlist_details("pl1", name="New Name", public=False)
 
         assert result.status == "success"
         mock_spotify_api.playlist_change_details.assert_called_once_with(
@@ -543,7 +1101,7 @@ class TestModifyPlaylistDetails:
         )
 
     def test_success_with_description(self, mock_spotify_api):
-        result = modify_playlist_details("pl1", description="new desc")
+        result = update_playlist_details("pl1", description="new desc")
 
         assert result.status == "success"
         mock_spotify_api.playlist_change_details.assert_called_once_with(
@@ -552,20 +1110,20 @@ class TestModifyPlaylistDetails:
 
     def test_no_fields_raises(self, mock_spotify_api):
         with pytest.raises(ValueError, match="At least one"):
-            modify_playlist_details("pl1")
+            update_playlist_details("pl1")
 
     def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api.playlist_change_details.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            modify_playlist_details("pl1", name="New Name")
+            update_playlist_details("pl1", name="New Name")
 
 
-class TestReorderPlaylistTracks:
+class TestReorderPlaylist:
     def test_moves_block_and_returns_snapshot(self, mock_spotify_api):
         mock_spotify_api._put.return_value = {"snapshot_id": "s3"}
 
-        result = reorder_playlist_tracks(
+        result = reorder_playlist(
             "pl1", range_start=0, insert_before=10, range_length=3
         )
 
@@ -579,7 +1137,7 @@ class TestReorderPlaylistTracks:
     def test_defaults_to_single_track(self, mock_spotify_api):
         mock_spotify_api._put.return_value = {"snapshot_id": "s3"}
 
-        result = reorder_playlist_tracks("pl1", range_start=5, insert_before=0)
+        result = reorder_playlist("pl1", range_start=5, insert_before=0)
 
         assert "Moved 1 track" in result.message
         mock_spotify_api._put.assert_called_once_with(
@@ -590,9 +1148,7 @@ class TestReorderPlaylistTracks:
     def test_passes_snapshot_id(self, mock_spotify_api):
         mock_spotify_api._put.return_value = {"snapshot_id": "s4"}
 
-        reorder_playlist_tracks(
-            "pl1", range_start=1, insert_before=4, snapshot_id="prev"
-        )
+        reorder_playlist("pl1", range_start=1, insert_before=4, snapshot_id="prev")
 
         mock_spotify_api._put.assert_called_once_with(
             "playlists/pl1/items",
@@ -606,22 +1162,20 @@ class TestReorderPlaylistTracks:
 
     def test_negative_position_raises(self, mock_spotify_api):
         with pytest.raises(ValueError, match=">= 0"):
-            reorder_playlist_tracks("pl1", range_start=-1, insert_before=0)
+            reorder_playlist("pl1", range_start=-1, insert_before=0)
 
     def test_zero_range_length_raises(self, mock_spotify_api):
         with pytest.raises(ValueError, match="range_length"):
-            reorder_playlist_tracks(
-                "pl1", range_start=0, insert_before=1, range_length=0
-            )
+            reorder_playlist("pl1", range_start=0, insert_before=1, range_length=0)
 
     def test_spotify_error(self, mock_spotify_api):
         mock_spotify_api._put.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            reorder_playlist_tracks("pl1", range_start=0, insert_before=1)
+            reorder_playlist("pl1", range_start=0, insert_before=1)
 
 
-class TestGetUserPlaylists:
+class TestListPlaylists:
     def test_success(self, mock_spotify_api, sample_playlist_data):
         mock_spotify_api.current_user_playlists.return_value = {
             "items": [sample_playlist_data],
@@ -630,7 +1184,7 @@ class TestGetUserPlaylists:
             "offset": 0,
         }
 
-        result = get_user_playlists()
+        result = list_playlists()
 
         assert len(result.items) == 1
         assert isinstance(result.items[0], Playlist)
@@ -642,7 +1196,7 @@ class TestGetUserPlaylists:
     def test_limit_clamped(self, mock_spotify_api):
         mock_spotify_api.current_user_playlists.return_value = {"items": []}
 
-        get_user_playlists(limit=999)
+        list_playlists(limit=999)
 
         mock_spotify_api.current_user_playlists.assert_called_once_with(
             limit=50, offset=0
@@ -652,7 +1206,7 @@ class TestGetUserPlaylists:
         mock_spotify_api.current_user_playlists.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
-            get_user_playlists()
+            list_playlists()
 
 
 class TestGetPlaylistTracks:
@@ -670,12 +1224,35 @@ class TestGetPlaylistTracks:
         assert result.total == 2
         assert result.returned == 2
         mock_spotify_api._get.assert_called_with(
-            "playlists/pl1/items", limit=50, offset=0
+            "playlists/pl1/items",
+            limit=50,
+            offset=0,
+            additional_types="track,episode",
         )
 
-    async def test_skips_null_track_items(self, mock_spotify_api, sample_track_data):
+    async def test_stripped_metadata_uses_items_total_not_page_length(
+        self, mock_spotify_api, sample_track_data
+    ):
+        # Restricted apps strip tracks.total; the items cursor still reports it
+        mock_spotify_api.playlist.return_value = {}
         mock_spotify_api._get.return_value = {
-            "items": [{"track": sample_track_data}, {"track": None}],
+            "items": [{"item": sample_track_data}],
+            "total": 65,
+            "next": "next-page",
+        }
+
+        result = await get_playlist_tracks("pl1", limit=1, offset=10)
+
+        assert result.returned == 1
+        assert result.offset == 10
+        assert result.total == 65
+
+    async def test_reads_entries_under_item_key(
+        self, mock_spotify_api, sample_track_data
+    ):
+        # The Web API returns playlist entries under "item", not "track"
+        mock_spotify_api._get.return_value = {
+            "items": [{"item": sample_track_data}, {"item": sample_track_data}],
             "total": 2,
             "next": None,
         }
@@ -683,29 +1260,71 @@ class TestGetPlaylistTracks:
 
         result = await get_playlist_tracks("pl1", limit=50)
 
-        assert result.returned == 1
+        assert result.returned == 2
+        assert result.items[0].id == sample_track_data["id"]
+
+    async def test_null_entries_returned_as_placeholders(
+        self, mock_spotify_api, sample_track_data
+    ):
+        # A null entry keeps its slot so positions stay aligned with the playlist
+        mock_spotify_api._get.return_value = {
+            "items": [{"item": sample_track_data}, {"item": None, "is_local": True}],
+            "total": 2,
+            "next": None,
+        }
+        mock_spotify_api.playlist.return_value = {"tracks": {"total": 2}}
+
+        result = await get_playlist_tracks("pl1", limit=50)
+
+        assert result.returned == 2
+        assert result.items[1].id is None
+        assert result.items[1].name == "Unavailable"
+        assert result.items[1].is_local is True
+
+    async def test_tracks_without_id_are_marked_not_dropped(
+        self, mock_spotify_api, sample_track_data
+    ):
+        # Local files and unavailable/removed tracks come back with "id": None
+        local_file = {**sample_track_data, "id": None, "is_local": True}
+        mock_spotify_api._get.return_value = {
+            "items": [{"item": sample_track_data}, {"item": local_file}],
+            "total": 2,
+            "next": None,
+        }
+        mock_spotify_api.playlist.return_value = {"tracks": {"total": 2}}
+
+        result = await get_playlist_tracks("pl1", limit=50)
+
+        assert result.returned == 2
+        assert result.items[0].id == sample_track_data["id"]
+        assert result.items[1].id is None
+        assert result.items[1].is_local is True
+        assert result.items[1].name == sample_track_data["name"]
+
+    async def test_limit_respected_when_no_entry_is_parseable(
+        self, mock_spotify_api, sample_track_data
+    ):
+        # Regression: unparseable rows used to leave `remaining` untouched, so a
+        # small limit paged through the whole playlist until the client timed out
+        mock_spotify_api._get.return_value = {
+            "items": [{"unexpected_key": sample_track_data}] * 5,
+            "total": 1263,
+            "next": "https://api.spotify.com/next",
+        }
+        mock_spotify_api.playlist.return_value = {"tracks": {"total": 1263}}
+
+        result = await get_playlist_tracks("pl1", limit=5)
+
+        assert mock_spotify_api._get.call_count == 1
+        assert result.returned == 5
+        assert all(t.id is None for t in result.items)
 
     async def test_spotify_error(self, mock_spotify_api):
         # Both regime shapes fail, so this is a real error rather than a fallback
         mock_spotify_api._get.side_effect = SPOTIFY_ERROR
-        mock_spotify_api.playlist_tracks.side_effect = SPOTIFY_ERROR
 
         with pytest.raises(ValueError):
             await get_playlist_tracks("pl1", limit=50)
-
-    async def test_reports_progress_with_context(
-        self, mock_spotify_api, mock_context, sample_track_data
-    ):
-        mock_spotify_api._get.return_value = {
-            "items": [{"track": sample_track_data}],
-            "total": 1,
-            "next": None,
-        }
-        mock_spotify_api.playlist.return_value = {"tracks": {"total": 1}}
-
-        await get_playlist_tracks("pl1", limit=50, ctx=mock_context)
-
-        mock_context.report_progress.assert_awaited_with(progress=1, total=1)
 
     async def test_paginates_across_multiple_batches(
         self, mock_spotify_api, sample_track_data
@@ -730,24 +1349,28 @@ class TestGetPlaylistTracks:
         assert mock_spotify_api._get.call_count == 2
         first, second = mock_spotify_api._get.call_args_list
         assert first.args == ("playlists/pl1/items",)
-        assert first.kwargs == {"limit": 100, "offset": 0}
-        assert second.kwargs == {"limit": 50, "offset": 100}
+        episodes = {"additional_types": "track,episode"}
+        assert first.kwargs == {"limit": 100, "offset": 0, **episodes}
+        assert second.kwargs == {"limit": 50, "offset": 100, **episodes}
 
-    async def test_stops_when_batch_shorter_than_requested(
+    async def test_a_short_page_with_a_next_cursor_is_not_the_end(
         self, mock_spotify_api, sample_track_data
     ):
-        # next is set but the page came back short -> loop must still terminate
-        mock_spotify_api._get.return_value = {
-            "items": [{"track": sample_track_data}] * 3,
-            "total": 500,
-            "next": "https://api.spotify.com/next",
-        }
-        mock_spotify_api.playlist.return_value = {"tracks": {"total": 500}}
+        # Spotify can serve fewer rows than asked for mid-playlist; stopping
+        # there silently truncated the result.
+        mock_spotify_api._get.side_effect = [
+            {
+                "items": [{"track": sample_track_data}] * 3,
+                "next": "https://api.spotify.com/next",
+            },
+            {"items": [{"track": sample_track_data}] * 2, "next": None},
+        ]
+        mock_spotify_api.playlist.return_value = {"tracks": {"total": 5}}
 
         result = await get_playlist_tracks("pl1", limit=100)
 
-        assert result.returned == 3
-        assert mock_spotify_api._get.call_count == 1
+        assert result.returned == 5
+        assert mock_spotify_api._get.call_args_list[1].kwargs["offset"] == 3
 
     async def test_empty_playlist_returns_no_tracks(self, mock_spotify_api):
         mock_spotify_api._get.return_value = {"items": []}
@@ -771,6 +1394,63 @@ class TestGetPlaylistTracks:
         result = await get_playlist_tracks("pl1", limit=50)
 
         assert result.total == 1
+
+    @staticmethod
+    def _serve_playlist(mock_spotify_api, track, size):
+        def page(path, limit, offset, **_):
+            rows = [{"track": track}] * max(0, min(limit, size - offset))
+            more = offset + len(rows) < size
+            return {"items": rows, "total": size, "next": "next" if more else None}
+
+        mock_spotify_api._get.side_effect = page
+        mock_spotify_api.playlist.return_value = {"tracks": {"total": size}}
+
+    @pytest.mark.parametrize("limit", [None, 5000])
+    async def test_a_read_stops_at_the_per_call_cap(
+        self, mock_spotify_api, sample_track_data, limit
+    ):
+        self._serve_playlist(mock_spotify_api, sample_track_data, 1500)
+
+        result = await get_playlist_tracks("pl1", limit=limit)
+
+        assert result.returned == MAX_PLAYLIST_TRACKS_PER_CALL == 1000
+        assert mock_spotify_api._get.call_count == 10
+        assert result.next_offset == 1000
+        assert result.truncated is True
+        assert result.total == 1500
+
+    async def test_continuing_from_next_offset_reaches_the_end(
+        self, mock_spotify_api, sample_track_data
+    ):
+        self._serve_playlist(mock_spotify_api, sample_track_data, 1500)
+
+        result = await get_playlist_tracks("pl1", offset=1000)
+
+        assert result.returned == 500
+        assert result.next_offset is None
+        assert result.truncated is False
+
+    async def test_a_playlist_of_exactly_the_cap_is_not_truncated(
+        self, mock_spotify_api, sample_track_data
+    ):
+        self._serve_playlist(mock_spotify_api, sample_track_data, 1000)
+
+        result = await get_playlist_tracks("pl1")
+
+        assert result.returned == 1000
+        assert result.next_offset is None
+        assert result.truncated is False
+
+    async def test_a_partial_page_points_at_the_next_one(
+        self, mock_spotify_api, sample_track_data
+    ):
+        self._serve_playlist(mock_spotify_api, sample_track_data, 200)
+
+        result = await get_playlist_tracks("pl1", limit=50, offset=10)
+
+        assert result.returned == 50
+        assert result.next_offset == 60
+        assert result.truncated is False
 
 
 class TestGetSavedTracks:
@@ -805,95 +1485,106 @@ class TestGetSavedTracks:
 
 
 class TestResources:
-    def test_current_user(self, mock_spotify_api):
+    """Read through the server, so JSON encoding and error mapping are real."""
+
+    async def _read(self, uri: str) -> dict:
+        [content] = await mcp.read_resource(uri)
+        assert content.mime_type == "application/json"
+        return json.loads(content.content)
+
+    async def test_current_user(self, mock_spotify_api):
         mock_spotify_api.current_user.return_value = {
             "id": "u1",
             "display_name": "Test User",
             "followers": {"total": 10},
-            "country": "US",
             "product": "premium",
         }
 
-        result = json.loads(current_user())
+        result = await self._read("spotify://user/current")
 
         assert result["id"] == "u1"
+        assert result["followers"] == 10
         assert result["product"] == "premium"
 
-    def test_current_user_error_returns_json_error(self, mock_spotify_api):
-        mock_spotify_api.current_user.side_effect = Exception("boom")
+    async def test_current_playback_shows_an_episode(self, mock_spotify_api):
+        mock_spotify_api.current_playback.return_value = {
+            "is_playing": True,
+            "item": PLAYING_EPISODE,
+            "device": {"name": "Kitchen"},
+        }
 
-        result = json.loads(current_user())
+        data = await self._read("spotify://playback/current")
 
-        assert "error" in result
+        mock_spotify_api.current_playback.assert_called_once_with(
+            additional_types="track,episode"
+        )
+        assert data["device"] == "Kitchen"
+        assert data["track"]["type"] == "episode"
+        assert data["track"]["show"] == "Some Podcast"
 
-    def test_current_playback_resource(self, mock_spotify_api, sample_playback_data):
-        mock_spotify_api.current_playback.return_value = sample_playback_data
-
-        result = json.loads(current_playback_resource())
-
-        assert result["is_playing"] is True
-        assert result["track"]["name"] == "Never Gonna Give You Up"
-
-    def test_current_playback_resource_no_playback(self, mock_spotify_api):
+    async def test_nothing_playing_reads_as_not_playing(self, mock_spotify_api):
         mock_spotify_api.current_playback.return_value = None
 
-        result = json.loads(current_playback_resource())
+        result = await self._read("spotify://playback/current")
 
-        assert result["status"] == "no_playback"
+        assert result["is_playing"] is False
+        assert result["track"] is None
 
-    def test_track_resource(self, mock_spotify_api, sample_track_data):
+    async def test_track_resource(self, mock_spotify_api, sample_track_data):
         mock_spotify_api.track.return_value = sample_track_data
 
-        result = json.loads(track_resource("4iV5W9uYEdYUVa79Axb7Rh"))
+        result = await self._read("spotify://track/4iV5W9uYEdYUVa79Axb7Rh")
 
         assert result["name"] == "Never Gonna Give You Up"
         mock_spotify_api.track.assert_called_once_with("4iV5W9uYEdYUVa79Axb7Rh")
 
-    def test_playlist_resource(self, mock_spotify_api, sample_playlist_data):
+    async def test_playlist_resource(self, mock_spotify_api, sample_playlist_data):
         mock_spotify_api.playlist.return_value = sample_playlist_data
 
-        result = json.loads(playlist_resource("pl1"))
+        result = await self._read("spotify://playlist/pl1")
 
         assert result["name"] == "RapCaviar"
+        assert result["total_tracks"] == 50
 
-    def test_artist_resource(self, mock_spotify_api, sample_artist_data):
+    async def test_artist_and_album_resources(
+        self, mock_spotify_api, sample_artist_data, sample_album_data
+    ):
         mock_spotify_api.artist.return_value = sample_artist_data
-
-        result = json.loads(artist_resource("a1"))
-
-        assert result["name"] == "Rick Astley"
-
-    def test_album_resource(self, mock_spotify_api, sample_album_data):
         mock_spotify_api.album.return_value = sample_album_data
 
-        result = json.loads(album_resource("al1"))
+        artist = await self._read("spotify://artist/a1")
+        album = await self._read("spotify://album/al1")
 
-        assert result["name"] == "Whenever You Need Somebody"
-
-    def test_current_playback_resource_error(self, mock_spotify_api):
-        mock_spotify_api.current_playback.side_effect = Exception("boom")
-
-        result = json.loads(current_playback_resource())
-
-        assert "error" in result
+        assert artist["name"] == "Rick Astley"
+        assert album["name"] == "Whenever You Need Somebody"
 
     @pytest.mark.parametrize(
-        "resource_fn, api_attr",
+        "uri, api_attr",
         [
-            (track_resource, "track"),
-            (playlist_resource, "playlist"),
-            (artist_resource, "artist"),
-            (album_resource, "album"),
+            ("spotify://user/current", "current_user"),
+            ("spotify://playback/current", "current_playback"),
+            ("spotify://track/t1", "track"),
+            ("spotify://playlist/pl1", "playlist"),
+            ("spotify://artist/a1", "artist"),
+            ("spotify://album/al1", "album"),
         ],
     )
-    def test_resource_error_returns_json_error(
-        self, mock_spotify_api, resource_fn, api_attr
-    ):
-        getattr(mock_spotify_api, api_attr).side_effect = Exception("boom")
+    async def test_spotify_errors_fail_the_read(self, mock_spotify_api, uri, api_attr):
+        # Before, a failure came back as successful content holding {"error": ...}.
+        getattr(mock_spotify_api, api_attr).side_effect = SpotifyException(
+            429, -1, "rate limited", headers={"Retry-After": "7"}
+        )
 
-        result = json.loads(resource_fn("badid"))
+        with pytest.raises(ResourceError, match="rate limit") as exc:
+            await mcp.read_resource(uri)
 
-        assert "error" in result
+        assert not isinstance(exc.value, ResourceNotFoundError)
+
+    async def test_a_missing_item_is_not_found(self, mock_spotify_api):
+        mock_spotify_api.track.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ResourceNotFoundError, match="track was not found"):
+            await mcp.read_resource("spotify://track/nope")
 
 
 class TestPrompts:
@@ -951,7 +1642,7 @@ class TestSaveTracks:
 
         assert result.status == "success"
         mock_spotify_api._put.assert_called_once_with(
-            "me/library", payload={"uris": ["spotify:track:abc"]}
+            "me/library", uris="spotify:track:abc"
         )
 
     def test_rejects_over_fifty(self, mock_spotify_api):
@@ -965,7 +1656,7 @@ class TestRemoveSavedTracks:
 
         assert result.status == "success"
         mock_spotify_api._delete.assert_called_once_with(
-            "me/library", payload={"uris": ["spotify:track:abc"]}
+            "me/library", uris="spotify:track:abc"
         )
 
 
@@ -974,7 +1665,9 @@ class TestUnfollowPlaylist:
         result = unfollow_playlist("spotify:playlist:pl1")
 
         assert result.status == "success"
-        mock_spotify_api.current_user_unfollow_playlist.assert_called_once_with("pl1")
+        mock_spotify_api._delete.assert_called_once_with(
+            "me/library", uris="spotify:playlist:pl1"
+        )
 
 
 class TestGetRecentlyPlayed:
@@ -1025,3 +1718,490 @@ class TestGetTopItems:
     def test_rejects_bad_time_range(self, mock_spotify_api):
         with pytest.raises(ValueError, match="time_range"):
             get_top_items("tracks", time_range="yesterday")
+
+
+class TestGetSavedAlbums:
+    def test_success_includes_added_at(self, mock_spotify_api, sample_album_data):
+        mock_spotify_api.current_user_saved_albums.return_value = {
+            "items": [
+                {"added_at": "2026-01-01T00:00:00Z", "album": sample_album_data},
+                {"added_at": "2026-01-02T00:00:00Z", "album": None},
+            ],
+            "total": 2,
+            "limit": 20,
+            "offset": 0,
+            "next": None,
+        }
+
+        result = get_saved_albums()
+
+        assert [a.name for a in result.items] == ["Whenever You Need Somebody"]
+        assert result.items[0].added_at == "2026-01-01T00:00:00Z"
+        assert result.items[0].artist == "Rick Astley"
+        assert result.total == 2
+
+    def test_restricted_album_without_label_or_popularity(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_albums.return_value = {
+            "items": [{"album": {"id": "al1", "name": "Stripped"}}],
+            "total": 1,
+        }
+
+        result = get_saved_albums()
+
+        assert result.items[0].label is None
+        assert result.items[0].popularity is None
+
+    def test_limit_clamped(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_albums.return_value = {"items": []}
+
+        get_saved_albums(limit=999, offset=40)
+
+        mock_spotify_api.current_user_saved_albums.assert_called_once_with(
+            limit=50, offset=40
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_albums.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_saved_albums()
+
+
+class TestGetFollowedArtists:
+    def test_returns_the_next_cursor(self, mock_spotify_api, sample_artist_data):
+        mock_spotify_api.current_user_followed_artists.return_value = {
+            "artists": {
+                "items": [sample_artist_data],
+                "total": 41,
+                "limit": 1,
+                "next": "https://api.spotify.com/v1/me/following?type=artist&after=x",
+                "cursors": {"after": "0gxyHStUsqpMadRV0Di1Qt"},
+            }
+        }
+
+        result = get_followed_artists(limit=1)
+
+        assert result.items[0].name == "Rick Astley"
+        assert result.after == "0gxyHStUsqpMadRV0Di1Qt"
+        assert result.total == 41
+
+    def test_passes_the_cursor_and_clamps_the_limit(self, mock_spotify_api):
+        mock_spotify_api.current_user_followed_artists.return_value = {
+            "artists": {"items": [], "cursors": {"after": None}}
+        }
+
+        result = get_followed_artists(limit=0, after="spotify:artist:a1")
+
+        mock_spotify_api.current_user_followed_artists.assert_called_once_with(
+            limit=1, after="a1"
+        )
+        assert result.after is None
+
+    def test_restricted_artist_without_followers(self, mock_spotify_api):
+        mock_spotify_api.current_user_followed_artists.return_value = {
+            "artists": {"items": [{"id": "a1", "name": "Stripped"}]}
+        }
+
+        result = get_followed_artists()
+
+        assert result.items[0].followers is None
+        assert result.items[0].popularity is None
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api.current_user_followed_artists.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_followed_artists()
+
+
+def library_uri(kind: str, item_id: str) -> str:
+    """The URI /me/library expects: it 500s on audiobook URIs, takes them as shows."""
+    return f"spotify:{'show' if kind == 'audiobook' else kind}:{item_id}"
+
+
+# (tool, sender attribute, uri kind, per-call cap)
+ENTITY_WRITES = [
+    (save_albums, "_put", "album", 20),
+    (remove_saved_albums, "_delete", "album", 20),
+    (follow_artists, "_put", "artist", 50),
+    (unfollow_artists, "_delete", "artist", 50),
+    (save_shows, "_put", "show", 50),
+    (remove_saved_shows, "_delete", "show", 50),
+    (save_episodes, "_put", "episode", 50),
+    (remove_saved_episodes, "_delete", "episode", 50),
+    (save_audiobooks, "_put", "audiobook", 50),
+    (remove_saved_audiobooks, "_delete", "audiobook", 50),
+]
+
+
+class TestEntityLibraryWriteTools:
+    @pytest.mark.parametrize(("tool", "sender", "kind", "cap"), ENTITY_WRITES)
+    def test_writes_uris_to_the_library(
+        self, mock_spotify_api, tool, sender, kind, cap
+    ):
+        result = tool(["a1", f"spotify:{kind}:a2"])
+
+        assert result.status == "success"
+        assert result.message.endswith(f"2 {kind}(s)")
+        getattr(mock_spotify_api, sender).assert_called_once_with(
+            "me/library", uris=f"{library_uri(kind, 'a1')},{library_uri(kind, 'a2')}"
+        )
+
+    @pytest.mark.parametrize(("tool", "sender", "kind", "cap"), ENTITY_WRITES)
+    def test_the_cap_is_enforced_before_any_request(
+        self, mock_spotify_api, tool, sender, kind, cap
+    ):
+        with pytest.raises(ValueError, match=f"Maximum {cap}"):
+            tool([f"id{i}" for i in range(cap + 1)])
+        getattr(mock_spotify_api, sender).assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("tool", "sender", "kind", "cap"),
+        [
+            *ENTITY_WRITES,
+            (save_tracks, "_put", "track", 50),
+            (remove_saved_tracks, "_delete", "track", 50),
+        ],
+    )
+    def test_an_empty_list_is_rejected(self, mock_spotify_api, tool, sender, kind, cap):
+        with pytest.raises(ValueError, match="At least one"):
+            tool([])
+        getattr(mock_spotify_api, sender).assert_not_called()
+
+    @pytest.mark.parametrize(("tool", "sender", "kind", "cap"), ENTITY_WRITES)
+    def test_the_full_cap_goes_out_in_chunks_of_forty(
+        self, mock_spotify_api, tool, sender, kind, cap
+    ):
+        tool([f"id{i}" for i in range(cap)])
+
+        calls = getattr(mock_spotify_api, sender).call_args_list
+        assert [len(c.kwargs["uris"].split(",")) for c in calls] == (
+            [40, 10] if cap == 50 else [20]
+        )
+
+    @pytest.mark.parametrize(
+        ("tool", "sender", "kind", "cap"),
+        [w for w in ENTITY_WRITES if w[3] > 40],
+    )
+    def test_failed_second_chunk_never_reports_success(
+        self, mock_spotify_api, tool, sender, kind, cap
+    ):
+        error = SpotifyException(429, -1, "Quota exceeded", reason="QUOTA_EXCEEDED")
+        getattr(mock_spotify_api, sender).side_effect = [None, error]
+
+        with pytest.raises(ValueError):
+            tool([f"id{i}" for i in range(cap)])
+
+
+class TestFollowPlaylist:
+    def test_follows_by_url(self, mock_spotify_api):
+        result = follow_playlist("https://open.spotify.com/playlist/pl1?si=abc")
+
+        assert result.status == "success"
+        mock_spotify_api._put.assert_called_once_with(
+            "me/library", uris="spotify:playlist:pl1"
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api._put.side_effect = SpotifyException(
+            403, -1, "Forbidden", reason="INSUFFICIENT_SCOPE"
+        )
+
+        with pytest.raises(ValueError):
+            follow_playlist("pl1")
+
+
+SAMPLE_SHOW = {
+    "id": "sh1",
+    "name": "Some Podcast",
+    "publisher": "Some Network",
+    "description": "Talk",
+    "total_episodes": 120,
+    "media_type": "audio",
+    "explicit": False,
+    "external_urls": {"spotify": "https://open.spotify.com/show/sh1"},
+}
+
+SAMPLE_EPISODE = {
+    "id": "ep1",
+    "name": "Episode 1",
+    "description": "First",
+    "release_date": "2026-01-01",
+    "duration_ms": 3600000,
+    "explicit": False,
+    "resume_point": {"fully_played": False, "resume_position_ms": 120000},
+    "external_urls": {"spotify": "https://open.spotify.com/episode/ep1"},
+}
+
+
+class TestGetSavedShows:
+    def test_success_includes_added_at(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_shows.return_value = {
+            "items": [
+                {"added_at": "2026-02-01T00:00:00Z", "show": SAMPLE_SHOW},
+                {"added_at": "2026-02-02T00:00:00Z", "show": None},
+            ],
+            "total": 2,
+            "limit": 20,
+            "offset": 0,
+        }
+
+        result = get_saved_shows()
+
+        assert [s.name for s in result.items] == ["Some Podcast"]
+        assert result.items[0].added_at == "2026-02-01T00:00:00Z"
+        assert result.items[0].total_episodes == 120
+
+    def test_restricted_show_without_publisher(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_shows.return_value = {
+            "items": [{"show": {"id": "sh1", "name": "Stripped"}}],
+            "total": 1,
+        }
+
+        assert get_saved_shows().items[0].publisher is None
+
+    def test_limit_clamped(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_shows.return_value = {"items": []}
+
+        get_saved_shows(limit=999, offset=5)
+
+        mock_spotify_api.current_user_saved_shows.assert_called_once_with(
+            limit=50, offset=5
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_shows.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_saved_shows()
+
+
+class TestCheckSavedShows:
+    def test_keyed_by_id_through_the_consolidated_route(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = [True, False]
+
+        result = check_saved_shows(["sh1", "spotify:show:sh2"])
+
+        assert result.results == {"sh1": True, "sh2": False}
+        mock_spotify_api._get.assert_called_once_with(
+            "me/library/contains", uris="spotify:show:sh1,spotify:show:sh2"
+        )
+
+    def test_legacy_apps_use_the_show_route(self, mock_spotify_api):
+        mock_spotify_api._get.side_effect = [
+            SpotifyException(400, -1, "bad request"),
+            [True],
+        ]
+
+        assert check_saved_shows(["sh1"]).results == {"sh1": True}
+        assert mock_spotify_api._get.call_args_list[-1].args == ("me/shows/contains",)
+
+    def test_more_than_fifty_is_rejected_before_requests(self, mock_spotify_api):
+        with pytest.raises(ValueError, match="Maximum 50"):
+            check_saved_shows([f"sh{i}" for i in range(51)])
+        mock_spotify_api._get.assert_not_called()
+
+
+class TestGetShowEpisodes:
+    def test_stamps_the_show_and_reads_resume_points(self, mock_spotify_api):
+        mock_spotify_api.show_episodes.return_value = {
+            "items": [SAMPLE_EPISODE, None],
+            "total": 120,
+            "limit": 20,
+            "offset": 0,
+            "next": "https://api.spotify.com/v1/shows/sh1/episodes?offset=20",
+        }
+
+        result = get_show_episodes("spotify:show:sh1")
+
+        mock_spotify_api.show_episodes.assert_called_once_with(
+            "sh1", limit=20, offset=0
+        )
+        assert len(result.items) == 1
+        episode = result.items[0]
+        assert episode.show_id == "sh1"
+        assert episode.resume_position_ms == 120000
+        assert episode.fully_played is False
+        assert result.total == 120
+
+    def test_limit_clamped(self, mock_spotify_api):
+        mock_spotify_api.show_episodes.return_value = {"items": []}
+
+        get_show_episodes("sh1", limit=0, offset=40)
+
+        mock_spotify_api.show_episodes.assert_called_once_with(
+            "sh1", limit=1, offset=40
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api.show_episodes.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_show_episodes("sh1")
+
+
+class TestGetSavedEpisodes:
+    def test_includes_show_and_added_at(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_episodes.return_value = {
+            "items": [
+                {
+                    "added_at": "2026-03-01T00:00:00Z",
+                    "episode": {**SAMPLE_EPISODE, "show": SAMPLE_SHOW},
+                },
+                {"added_at": "2026-03-02T00:00:00Z", "episode": None},
+            ],
+            "total": 2,
+        }
+
+        result = get_saved_episodes()
+
+        assert len(result.items) == 1
+        assert result.items[0].show == "Some Podcast"
+        assert result.items[0].show_id == "sh1"
+        assert result.items[0].added_at == "2026-03-01T00:00:00Z"
+
+    def test_limit_clamped(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_episodes.return_value = {"items": []}
+
+        get_saved_episodes(limit=999)
+
+        mock_spotify_api.current_user_saved_episodes.assert_called_once_with(
+            limit=50, offset=0
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api.current_user_saved_episodes.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_saved_episodes()
+
+
+SAMPLE_AUDIOBOOK = {
+    "id": "ab1",
+    "name": "A Book",
+    "authors": [{"name": "Author One"}],
+    "narrators": [{"name": "Narrator One"}],
+    "publisher": "House",
+    "edition": "Unabridged",
+    "total_chapters": 30,
+    "explicit": False,
+    "external_urls": {"spotify": "https://open.spotify.com/audiobook/ab1"},
+}
+
+
+class TestGetSavedAudiobooks:
+    def test_reads_bare_audiobook_items(self, mock_spotify_api):
+        # The reference documents SimplifiedAudiobookObject items, unwrapped.
+        mock_spotify_api._get.return_value = {
+            "items": [SAMPLE_AUDIOBOOK, None],
+            "total": 1,
+            "limit": 20,
+            "offset": 0,
+        }
+
+        result = get_saved_audiobooks()
+
+        mock_spotify_api._get.assert_called_once_with(
+            "me/audiobooks", limit=20, offset=0
+        )
+        book = result.items[0]
+        assert book.authors == ["Author One"]
+        assert book.narrators == ["Narrator One"]
+        assert book.added_at is None
+        assert result.total == 1
+
+    def test_reads_wrapped_items_with_added_at(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = {
+            "items": [
+                {"added_at": "2026-04-01T00:00:00Z", "audiobook": SAMPLE_AUDIOBOOK}
+            ],
+            "total": 1,
+        }
+
+        result = get_saved_audiobooks()
+
+        assert result.items[0].id == "ab1"
+        assert result.items[0].added_at == "2026-04-01T00:00:00Z"
+
+    def test_restricted_audiobook_without_publisher(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = {
+            "items": [{"id": "ab1", "name": "Stripped"}],
+            "total": 1,
+        }
+
+        assert get_saved_audiobooks().items[0].publisher is None
+
+    def test_limit_clamped(self, mock_spotify_api):
+        mock_spotify_api._get.return_value = {"items": []}
+
+        get_saved_audiobooks(limit=999, offset=10)
+
+        mock_spotify_api._get.assert_called_once_with(
+            "me/audiobooks", limit=50, offset=10
+        )
+
+    def test_spotify_error(self, mock_spotify_api):
+        mock_spotify_api._get.side_effect = SPOTIFY_ERROR
+
+        with pytest.raises(ValueError):
+            get_saved_audiobooks()
+
+
+class TestCheckSavedEpisodesAndAudiobooks:
+    @pytest.mark.parametrize(
+        ("tool", "kind"),
+        [(check_saved_episodes, "episode"), (check_saved_audiobooks, "audiobook")],
+    )
+    def test_keyed_by_id_through_the_consolidated_route(
+        self, mock_spotify_api, tool, kind
+    ):
+        mock_spotify_api._get.return_value = [True, False]
+
+        result = tool(["x1", f"spotify:{kind}:x2"])
+
+        assert result.results == {"x1": True, "x2": False}
+        assert result.checked == 2
+        mock_spotify_api._get.assert_called_once_with(
+            "me/library/contains",
+            uris=f"{library_uri(kind, 'x1')},{library_uri(kind, 'x2')}",
+        )
+
+    @pytest.mark.parametrize(
+        ("tool", "legacy_path"),
+        [
+            (check_saved_episodes, "me/episodes/contains"),
+            (check_saved_audiobooks, "me/audiobooks/contains"),
+        ],
+    )
+    def test_legacy_apps_use_the_entity_route(
+        self, mock_spotify_api, tool, legacy_path
+    ):
+        mock_spotify_api._get.side_effect = [
+            SpotifyException(404, -1, "not served"),
+            [True],
+        ]
+
+        assert tool(["x1"]).results == {"x1": True}
+        assert mock_spotify_api._get.call_args_list[-1].args == (legacy_path,)
+
+    @pytest.mark.parametrize("tool", [check_saved_episodes, check_saved_audiobooks])
+    def test_fifty_items_go_out_in_two_chunks(self, mock_spotify_api, tool):
+        mock_spotify_api._get.side_effect = [[False] * 40, [True] * 10]
+
+        result = tool([f"id{i}" for i in range(50)])
+
+        assert result.results == {f"id{i}": i >= 40 for i in range(50)}
+        assert mock_spotify_api._get.call_count == 2
+
+    @pytest.mark.parametrize("tool", [check_saved_episodes, check_saved_audiobooks])
+    def test_more_than_fifty_is_rejected_before_requests(self, mock_spotify_api, tool):
+        with pytest.raises(ValueError, match="Maximum 50"):
+            tool([f"id{i}" for i in range(51)])
+        mock_spotify_api._get.assert_not_called()
+
+    @pytest.mark.parametrize("tool", [check_saved_episodes, check_saved_audiobooks])
+    def test_a_short_answer_is_an_error_not_a_mis_zip(self, mock_spotify_api, tool):
+        mock_spotify_api._get.return_value = [True]
+
+        with pytest.raises(ValueError):
+            tool(["x1", "x2"])

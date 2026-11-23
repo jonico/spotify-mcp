@@ -1,8 +1,8 @@
 """
-FastMCP test configuration and fixtures.
+Test configuration and fixtures.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -16,6 +16,16 @@ def reset_regime_cache():
     spotify_api._legacy_families.clear()
     yield
     spotify_api._legacy_families.clear()
+
+
+@pytest.fixture(autouse=True)
+def no_playback_confirm_delay():
+    """`control_playback` waits between read-backs while confirming an action took
+    effect. A static mock never changes, so every unconfirmable action would burn the
+    full delay budget and the suite would crawl. Attempt count is left alone so the
+    retry behaviour itself stays under test."""
+    with patch("spotify_mcp.fastmcp_server._CONFIRM_DELAY_S", 0):
+        yield
 
 
 # Sample Spotify API response data for testing
@@ -60,30 +70,6 @@ SAMPLE_SEARCH_RESULTS = {
         "next": None,
         "previous": None,
     },
-    "albums": {
-        "items": [],
-        "total": 0,
-        "limit": 10,
-        "offset": 0,
-        "next": None,
-        "previous": None,
-    },
-    "artists": {
-        "items": [],
-        "total": 0,
-        "limit": 10,
-        "offset": 0,
-        "next": None,
-        "previous": None,
-    },
-    "playlists": {
-        "items": [],
-        "total": 0,
-        "limit": 10,
-        "offset": 0,
-        "next": None,
-        "previous": None,
-    },
 }
 
 
@@ -121,11 +107,8 @@ def mock_spotify_client():
     # Mock common methods
     mock_client.current_playback.return_value = SAMPLE_PLAYBACK_STATE
     mock_client.search.return_value = SAMPLE_SEARCH_RESULTS
-    mock_client.user_playlists.return_value = {"items": [SAMPLE_PLAYLIST]}
     mock_client.playlist.return_value = SAMPLE_PLAYLIST
     mock_client.track.return_value = SAMPLE_TRACK
-    mock_client.playlist_add_items.return_value = {"snapshot_id": "test123"}
-    mock_client.user_playlist_create.return_value = SAMPLE_PLAYLIST
 
     return mock_client
 
@@ -135,21 +118,6 @@ def mock_spotify_api(mock_spotify_client):
     """Mock the spotify_api module."""
     with patch("spotify_mcp.fastmcp_server.spotify_client", mock_spotify_client):
         yield mock_spotify_client
-
-
-@pytest.fixture
-def mock_context():
-    """A mock MCP Context with async progress/log/elicit methods.
-
-    Defaults to a client that supports elicitation; tests that exercise the
-    unsupported path flip check_client_capability to return False.
-    """
-    ctx = MagicMock()
-    ctx.report_progress = AsyncMock()
-    ctx.info = AsyncMock()
-    ctx.elicit = AsyncMock()
-    ctx.session.check_client_capability = MagicMock(return_value=True)
-    return ctx
 
 
 @pytest.fixture
