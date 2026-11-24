@@ -1,0 +1,12 @@
+$kind: kafka-message
+topic: kt-json-gzip-{{run_id}}
+key:
+  contentType: text
+  content: order-1
+value:
+  contentType: json
+  content: "{\"id\": 1}"
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka json-gzip/Kafka json-gzip.yaml
+order: 1000

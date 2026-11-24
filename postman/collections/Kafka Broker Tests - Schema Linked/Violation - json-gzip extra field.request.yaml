@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"id": 1, "status": "created", "extra": true} to the topic of the linked spec `Kafka json-gzip`,
+  which says: no additional properties are allowed. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - json-gzip extra field.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"id": 1, "status": "created", "extra": true};
+      pm.test("Violation - json-gzip extra field: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - json-gzip extra field: EXPECTED TO FAIL: the value breaks the linked schema (no additional properties are allowed)", function () { pm.expect(Object.keys(v).every(function (k) { return k === "id" || k === "status"; }), "no additional properties are allowed").to.equal(true); });
+order: 302000

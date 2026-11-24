@@ -1,5 +1,10 @@
 $kind: collection
 description: |-
+  **Schema violations (expected to fail).** The seven `Violation - ...` requests at the end send payloads that break their
+  linked spec on purpose. In each, the assertion named `EXPECTED TO FAIL` is red by design. The assertion `the app accepts
+  the send` is red only if the app rejects a schema-breaking message, so it shows whether the app enforces the schema.
+  Run them last: they write to the same topics as the valid requests.
+
   **This is the schema-linked variant, for the Postman app.** Every producer message links to an
   AsyncAPI spec in `postman/specs` (`Kafka json-gzip`, `Kafka text-none`, ...), which describes its topic,
   key and payload. Run it from the app. `postman collection run` (CLI 1.93.1) fails every producer in it

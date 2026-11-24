@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"x": 1} to the topic of the linked spec `Kafka tombstone`,
+  which says: a tombstone must have no value. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - tombstone carries a value.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"x": 1};
+      pm.test("Violation - tombstone carries a value: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - tombstone carries a value: EXPECTED TO FAIL: the value breaks the linked schema (a tombstone must have no value)", function () { pm.expect(v === undefined || v === null, "a tombstone must have no value").to.equal(true); });
+order: 306000

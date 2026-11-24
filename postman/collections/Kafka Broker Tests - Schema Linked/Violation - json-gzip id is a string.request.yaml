@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"id": "1", "status": "created"} to the topic of the linked spec `Kafka json-gzip`,
+  which says: id must be an integer. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - json-gzip id is a string.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"id": "1", "status": "created"};
+      pm.test("Violation - json-gzip id is a string: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - json-gzip id is a string: EXPECTED TO FAIL: the value breaks the linked schema (id must be an integer)", function () { pm.expect(Number.isInteger(v.id), "id must be an integer").to.equal(true); });
+order: 300000

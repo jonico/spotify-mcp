@@ -1,0 +1,12 @@
+$kind: kafka-message
+topic: kt-json-zstd-{{run_id}}
+key:
+  contentType: text
+  content: order-5
+value:
+  contentType: json
+  content: "{\"id\": 5}"
+schema:
+  source: specification
+  specificationId: ../postman/specs/Kafka json-zstd/Kafka json-zstd.yaml
+order: 1000

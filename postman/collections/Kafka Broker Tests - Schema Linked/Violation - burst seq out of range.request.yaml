@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"seq": 9} to the topic of the linked spec `Kafka burst`,
+  which says: seq must be between 1 and 3. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - burst seq out of range.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"seq": 9};
+      pm.test("Violation - burst seq out of range: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - burst seq out of range: EXPECTED TO FAIL: the value breaks the linked schema (seq must be between 1 and 3)", function () { pm.expect(v.seq >= 1 && v.seq <= 3, "seq must be between 1 and 3").to.equal(true); });
+order: 304000

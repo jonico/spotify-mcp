@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"text": "hello kafka"} to the topic of the linked spec `Kafka text-none`,
+  which says: the value must be a text string. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - text-none value is an object.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"text": "hello kafka"};
+      pm.test("Violation - text-none value is an object: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - text-none value is an object: EXPECTED TO FAIL: the value breaks the linked schema (the value must be a text string)", function () { pm.expect(typeof v === "string", "the value must be a text string").to.equal(true); });
+order: 305000

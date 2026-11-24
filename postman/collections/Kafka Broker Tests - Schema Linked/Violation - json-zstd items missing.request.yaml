@@ -1,0 +1,17 @@
+$kind: kafka-request
+description: |-
+  **Deliberate schema violation, expected to fail.** Sends {"id": 5} to the topic of the linked spec `Kafka json-zstd`,
+  which says: items is required. The second assertion fails by design; the first fails only if the app rejects the send.
+mode: producer
+url:
+  - "{{kafka_bootstrap}}"
+acknowledgements: all
+messages: .resources/Violation - json-zstd items missing.resources/messages
+scripts:
+  - type: afterProduce
+    code: |-
+      const r = pm.response;
+      const v = r.value !== undefined ? r.value : {"id": 5};
+      pm.test("Violation - json-zstd items missing: the app accepts the send (goes red if the app enforces the linked schema)", function () { pm.expect(r.error, "error").to.equal(undefined); });
+      pm.test("Violation - json-zstd items missing: EXPECTED TO FAIL: the value breaks the linked schema (items is required)", function () { pm.expect(Array.isArray(v.items), "items is required").to.equal(true); });
+order: 303000
